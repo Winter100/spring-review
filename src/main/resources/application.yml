@@ -1,0 +1,39 @@
+security:
+  jwt:
+    secret-base64: ${JWT_SECRET_BASE64}
+    issuer: project-review
+
+  app:
+    frontend-origin: http://localhost:3000
+
+spring:
+  config:
+    import: "optional:file:./.env[.properties]" # 실행 디렉터리의 .env를 설정 파일로 읽습니다.
+  datasource:
+    url: jdbc:postgresql://localhost:5432/review_db # Docker PostgreSQL 접속 주소
+    username: review # POSTGRES_USER와 동일
+    password: ${POSTGRES_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+#  datasource:
+#    url: jdbc:h2:mem:testdb # 메모리 기반 H2 데이터베이스
+#    driver-class-name: org.h2.Driver
+#    username: sa
+#    password:
+#
+#  h2:
+#    console:
+#      enabled: true # H2 웹 콘솔 활성화
+#      path: /h2-console # 웹 콘솔 접근 경로
+
+# R2 입력값은 프로젝트 루트 .env에 작성합니다. 입력 예시는 .env.example을 참고합니다.
+storage:
+  endpoint: ${R2_ENDPOINT} # 업로드 서명용 S3 API 주소
+  region: auto
+  bucket: ${R2_BUCKET}
+  access-key: ${R2_ACCESS_KEY_ID}
+  secret-key: ${R2_SECRET_ACCESS_KEY}
+  public-base-url: ${R2_PUBLIC_BASE_URL} # 조회용 공개 도메인 (버킷 이름 제외)

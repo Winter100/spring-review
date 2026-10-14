@@ -50,19 +50,25 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> {
                     // 서버 내부 오류 응답은 원래 상태 코드로 전달합니다.
                     auth.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                            // 회원가입과 로그인은 인증 없이 접근할 수 있습니다.
+
                             .requestMatchers(
                                     HttpMethod.POST,
                                     "/api/v1/member",
                                     "/api/v1/member/login"
                             ).permitAll()
-                            .requestMatchers(HttpMethod.GET, "/api/v1/reviews").permitAll();
+                            .requestMatchers(HttpMethod.GET, "/api/v1/reviews/**").permitAll();
 
                     // 콘솔이 비활성화되면 설정 빈도 없으므로 매처를 등록하지 않습니다.
                     if (h2ConsoleProperties.getIfAvailable() != null) {
                         auth.requestMatchers(PathRequest.toH2Console()).permitAll();
                     }
-
+                    auth.requestMatchers(
+                            HttpMethod.GET,
+                            "/swagger-ui.html",
+                            "/swagger-ui/**",
+                            "/v3/api-docs",
+                            "/v3/api-docs/**"
+                    ).permitAll();
                     auth.anyRequest().authenticated();
                 })
                 .exceptionHandling(exceptions -> exceptions

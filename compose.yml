@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:17 # PostgreSQL 17 이미지 사용
+    container_name: review-postgres # 컨테이너 이름
+    environment:
+      POSTGRES_DB: review_db # 최초 생성할 데이터베이스
+      POSTGRES_USER: review # 개발용 DB 사용자
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+    ports:
+      - "127.0.0.1:5432:5432" # 로컬 PC에서만 접근 허용
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # DB 데이터를 볼륨에 유지
+volumes:
+  postgres_data: # 컨테이너를 재생성해도 데이터 보존
