@@ -1,10 +1,11 @@
-package com.project.review.member;
+package com.project.review.member.service;
 
 import com.project.review.member.dtos.LoginRequest;
 import com.project.review.member.dtos.MemberRequest;
 import com.project.review.member.dtos.MemberResponse;
 import com.project.review.member.entities.Member;
 import com.project.review.member.entities.RefreshToken;
+import com.project.review.member.exception.DuplicateMemberException;
 import com.project.review.member.exception.MemberNotFoundException;
 import com.project.review.member.repository.MemberRepository;
 import com.project.review.member.repository.RefreshTokenRepository;

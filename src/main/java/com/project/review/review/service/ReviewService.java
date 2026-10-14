@@ -4,7 +4,7 @@ import com.project.review.category.entities.Category;
 import com.project.review.category.service.CategoryService;
 import com.project.review.common.exception.BusinessException;
 import com.project.review.common.exception.ErrorCode;
-import com.project.review.member.MemberService;
+import com.project.review.member.service.MemberService;
 import com.project.review.member.entities.Member;
 import com.project.review.review.dtos.ReviewRequest;
 import com.project.review.review.dtos.ReviewResponse;

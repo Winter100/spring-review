@@ -1,4 +1,4 @@
-package com.project.review.member;
+package com.project.review.member.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;

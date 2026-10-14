@@ -2,7 +2,7 @@ package com.project.review.common;
 
 import com.project.review.common.dtos.CustomErrorResponse;
 import com.project.review.common.exception.BusinessException;
-import com.project.review.member.DuplicateMemberException;
+import com.project.review.member.exception.DuplicateMemberException;
 import com.project.review.member.exception.MemberNotFoundException;
 import com.project.review.review.exception.ReviewNotFoundException;
 import lombok.extern.slf4j.Slf4j;

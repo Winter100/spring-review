@@ -1,4 +1,4 @@
-package com.project.review.member;
+package com.project.review.member.service;
 
 import com.project.review.member.entities.Member;
 import com.project.review.member.repository.MemberRepository;

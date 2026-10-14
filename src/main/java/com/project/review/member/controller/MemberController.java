@@ -1,9 +1,10 @@
-package com.project.review.member;
+package com.project.review.member.controller;
 
 import com.project.review.member.dtos.LoginRequest;
 import com.project.review.member.dtos.MemberRequest;
 import com.project.review.member.dtos.MemberResponse;
 import com.project.review.member.dtos.TokenResponse;
+import com.project.review.member.service.MemberService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
