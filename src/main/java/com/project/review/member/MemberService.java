@@ -5,9 +5,9 @@ import com.project.review.member.dtos.MemberRequest;
 import com.project.review.member.dtos.MemberResponse;
 import com.project.review.member.entities.Member;
 import com.project.review.member.entities.RefreshToken;
+import com.project.review.member.exception.MemberNotFoundException;
 import com.project.review.member.repository.MemberRepository;
 import com.project.review.member.repository.RefreshTokenRepository;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -15,9 +15,11 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -76,4 +78,11 @@ public class MemberService {
 
         return new LoginResult(accessToken, refreshToken);
     }
+
+    @Transactional(readOnly = true)
+    public Member findById(Long memberId){
+         return memberRepository.findById(memberId)
+                 .orElseThrow(MemberNotFoundException::new);
+    }
+
 }

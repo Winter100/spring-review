@@ -1,7 +1,10 @@
 package com.project.review.common;
 
 import com.project.review.common.dtos.CustomErrorResponse;
+import com.project.review.common.exception.BusinessException;
 import com.project.review.member.DuplicateMemberException;
+import com.project.review.member.exception.MemberNotFoundException;
+import com.project.review.review.exception.ReviewNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -12,6 +15,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.List;
 import java.util.Locale;
@@ -43,6 +47,13 @@ public class GlobaclExceptionHandler {
                 .body(errors);
     }
 
+    @ExceptionHandler(BusinessException.class) // 모든 BusinessException 처리
+    public ResponseEntity<CustomErrorResponse> handleBusinessException(
+            BusinessException ex // 발생한 예외
+    ) {
+        return error(ex.getErrorCode().getStatus(), ex.getMessage());
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<CustomErrorResponse> handleArgument(
             IllegalArgumentException ex
@@ -67,6 +78,23 @@ public class GlobaclExceptionHandler {
         return error(HttpStatus.BAD_REQUEST, "요청 본문이 없거나 JSON 형식이 올바르지 않습니다.");
     }
 
+    @ExceptionHandler(ReviewNotFoundException.class)
+    public ResponseEntity<CustomErrorResponse> handleReviewNotFound(
+            ReviewNotFoundException ex
+    ) {
+        return error(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<CustomErrorResponse> handleTypeMismatch(
+            MethodArgumentTypeMismatchException ex
+    ) {
+        return error(
+                HttpStatus.BAD_REQUEST,
+                "요청 파라미터 '" + ex.getName() + "'의 형식이 올바르지 않습니다."
+        );
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<CustomErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex) {
         for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
@@ -85,6 +113,14 @@ public class GlobaclExceptionHandler {
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다.");
     }
 
+    @ExceptionHandler(MemberNotFoundException.class)
+    private ResponseEntity<CustomErrorResponse> handleMemberNotFound(
+            MemberNotFoundException ex
+    ) {
+        return error(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+
     private String normalizeConstraintName(String constraintName) {
         if (constraintName == null || constraintName.isBlank()) {
             return "";
@@ -96,4 +132,5 @@ public class GlobaclExceptionHandler {
     private ResponseEntity<CustomErrorResponse> error(HttpStatus status, String message) {
         return ResponseEntity.status(status).body(new CustomErrorResponse(message));
     }
+
 }
