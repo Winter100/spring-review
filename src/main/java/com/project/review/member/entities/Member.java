@@ -1,5 +1,6 @@
 package com.project.review.member.entities;
 
+import com.project.review.review.entities.Review;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -14,7 +15,10 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,7 +27,8 @@ import java.util.List;
  * 이메일
  * 비밀번호
  * 닉네임
- * 프로필 이미지(옵션) - Todo
+ * Role
+ * 프로필 이미지(옵션)
  */
 
 @Entity
@@ -51,8 +56,19 @@ public class Member {
     @Column(nullable = false)
     private Role role = Role.USER;
 
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
+    private Instant createdAt;
+
+    @UpdateTimestamp
+    @Column(nullable = false)
+    private Instant updatedAt;
+
     @OneToMany(mappedBy = "member")
     private List<RefreshToken> refreshTokenList = new ArrayList<>();
+
+    @OneToMany(mappedBy = "author")
+    private List<Review> reviewList = new ArrayList<>();
 
     @Builder
     public Member(String email, String nickname, String password) {

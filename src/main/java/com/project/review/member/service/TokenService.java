@@ -1,5 +1,7 @@
 package com.project.review.member.service;
 
+import com.project.review.common.config.TokenProperties;
+import com.project.review.member.entities.Member;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -12,30 +14,31 @@ import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Objects;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class TokenService {
-    private final JwtEncoder jwtEncoder;
-    private final SecureRandom secureRandom = new SecureRandom();
 
     @Value("${security.jwt.issuer}")
     private String issuer;
+    private final JwtEncoder jwtEncoder;
+    private final TokenProperties tokenProperties;
 
-    public String createAccessToken(Long memberId){
+    public String createAccessToken(Member member) {
         Instant now = Instant.now();
 
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(issuer)
-                .subject(memberId.toString())
+                .subject(member.getId().toString())
+                .claim("role", member.getRole().name())
+                .id(UUID.randomUUID().toString())
                 .issuedAt(now)
-                .expiresAt(now.plus(15, ChronoUnit.MINUTES))
+                .expiresAt(now.plus(tokenProperties.accessTokenExpiresMinutes(), ChronoUnit.MINUTES))
                 .build();
 
         JwsHeader jwsHeader = JwsHeader.with(MacAlgorithm.HS256).build();
@@ -44,13 +47,21 @@ public class TokenService {
                 .getTokenValue();
     }
 
-    public String createRefreshToken(){
-        byte[] bytes = new byte[32];
-        secureRandom.nextBytes(bytes);
+    public String createRefreshToken(Member member) {
+        Instant now = Instant.now();
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer(issuer)
+                .subject(member.getId().toString())
+                .claim("token_use", "refresh")
+                // 같은 회원이 연속 로그인해도 서로 다른 토큰을 발급합니다.
+                .id(UUID.randomUUID().toString())
+                .issuedAt(now)
+                .expiresAt(now.plus(tokenProperties.refreshTokenExpiresDays(), ChronoUnit.DAYS))
+                .build();
 
-        return Base64.getUrlEncoder()
-                .withoutPadding()
-                .encodeToString(bytes);
+        JwsHeader jwsHeader = JwsHeader.with(MacAlgorithm.HS256).build();
+        return jwtEncoder.encode(JwtEncoderParameters.from(jwsHeader, claims))
+                .getTokenValue();
     }
 
     public String hashRefreshToken(String refreshToken) {

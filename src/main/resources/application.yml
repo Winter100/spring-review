@@ -2,6 +2,8 @@ security:
   jwt:
     secret-base64: ${JWT_SECRET_BASE64}
     issuer: project-review
+    access-token-expires-minutes: ${ACCESS_TOKEN_EXPIRES_MINUTES}
+    refresh-token-expires-days: ${REFRESH_TOKEN_EXPIRES_DAYS}
 
   app:
     frontend-origin: http://localhost:3000

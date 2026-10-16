@@ -3,6 +3,10 @@ package com.project.review.common;
 import com.project.review.common.dtos.CustomErrorResponse;
 import com.project.review.common.exception.BusinessException;
 import com.project.review.member.exception.DuplicateMemberException;
+import com.project.review.member.exception.RefreshTokenException;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import com.project.review.member.exception.MemberNotFoundException;
 import com.project.review.review.exception.ReviewNotFoundException;
 import lombok.extern.slf4j.Slf4j;
@@ -66,6 +70,26 @@ public class GlobaclExceptionHandler {
             BadCredentialsException ex
     ) {
         return error(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 틀렸습니다.");
+    }
+
+    @ExceptionHandler(RefreshTokenException.class)
+    public ResponseEntity<CustomErrorResponse> handleRefreshToken(
+            RefreshTokenException ex,
+            HttpServletRequest request
+    ) {
+        // 로그인 때와 같은 이름과 경로로 만료시켜 브라우저의 쿠키를 삭제합니다.
+        ResponseCookie expiredCookie = ResponseCookie.from("refreshToken", "")
+                .httpOnly(true)
+                .secure(request.isSecure())
+                .sameSite("Lax")
+                .path("/api/v1")
+                .maxAge(0)
+                .build();
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .header(HttpHeaders.SET_COOKIE, expiredCookie.toString())
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(new CustomErrorResponse(ex.getMessage()));
     }
 
     @ExceptionHandler(DuplicateMemberException.class)

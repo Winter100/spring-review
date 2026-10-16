@@ -4,6 +4,9 @@ import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
 
@@ -47,7 +50,14 @@ public class JwtConfig {
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
 
-        decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuer));
+        // 리프레시 토큰을 Bearer 액세스 토큰으로 사용하는 요청은 거절합니다.
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                JwtValidators.createDefaultWithIssuer(issuer),
+                jwt -> "refresh".equals(jwt.getClaimAsString("token_use"))
+                        ? OAuth2TokenValidatorResult.failure(new OAuth2Error(
+                                "invalid_token", "리프레시 토큰은 API 인증에 사용할 수 없습니다.", null))
+                        : OAuth2TokenValidatorResult.success()
+        ));
 
         return decoder;
     }
