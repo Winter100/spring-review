@@ -3,8 +3,8 @@ package com.project.review.review.entities;
 import com.project.review.category.entities.Category;
 import com.project.review.member.entities.Member;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Size;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -13,6 +13,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -46,10 +47,10 @@ public class Review {
     @Size(min = 1, max = 5000)
     private String content;
 
-    @Min(0)
-    @Max(5)
+    @DecimalMin("0")
+    @DecimalMax("5")
     @Column(nullable = false)
-    private double rating;
+    private BigDecimal rating;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
@@ -77,7 +78,7 @@ public class Review {
     }
 
     @Builder
-    public Review(String title, String content, double rating, Member author, Category category) {
+    public Review(String title, String content, BigDecimal rating, Member author, Category category) {
         this.title = title;
         this.content = content;
         this.rating = rating;

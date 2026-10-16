@@ -1,6 +1,6 @@
 package com.project.review.common.config;
 
-import com.project.review.common.security.SecurityErrorHandler;
+import com.project.review.common.exception.SecurityErrorHandler;
 import jakarta.servlet.DispatcherType;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.h2console.autoconfigure.H2ConsoleProperties;
@@ -11,8 +11,9 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -22,6 +23,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import java.util.List;
 
 @Configuration
+@EnableMethodSecurity
 public class SecurityConfig {
 
     @Bean
@@ -53,34 +55,35 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> {
                     // 서버 내부 오류 응답은 원래 상태 코드로 전달합니다.
                     auth.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-
+                            .requestMatchers(
+                                    HttpMethod.GET,
+                                    "/api/v1/categories",
+                                    "/api/v1/reviews/**",
+                                    "/swagger-ui.html",
+                                    "/swagger-ui/**",
+                                    "/v3/api-docs",
+                                    "/v3/api-docs/**"
+                            ).permitAll()
                             .requestMatchers(
                                     HttpMethod.POST,
                                     "/api/v1/member",
                                     "/api/v1/member/login",
                                     "/api/v1/member/refresh"
-                            ).permitAll()
-                            .requestMatchers(HttpMethod.GET, "/api/v1/reviews/**").permitAll();
+                            ).permitAll();
 
                     // 콘솔이 비활성화되면 설정 빈도 없으므로 매처를 등록하지 않습니다.
                     if (h2ConsoleProperties.getIfAvailable() != null) {
                         auth.requestMatchers(PathRequest.toH2Console()).permitAll();
                     }
-                    auth.requestMatchers(
-                            HttpMethod.GET,
-                            "/swagger-ui.html",
-                            "/swagger-ui/**",
-                            "/v3/api-docs",
-                            "/v3/api-docs/**"
-                    ).permitAll();
                     auth.anyRequest().authenticated();
                 })
-                .exceptionHandling(exceptions -> exceptions
+
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
                         .authenticationEntryPoint(securityErrorHandler)
                         .accessDeniedHandler(securityErrorHandler)
                 )
-                .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
+                .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(securityErrorHandler)
                         .accessDeniedHandler(securityErrorHandler)
                 );

@@ -1,4 +1,4 @@
-package com.project.review.common.security;
+package com.project.review.common.exception;
 
 import com.project.review.common.dtos.CustomErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;

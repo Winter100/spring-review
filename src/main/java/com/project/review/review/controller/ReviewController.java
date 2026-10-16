@@ -15,18 +15,14 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@Tag(name = "Review", description = "리뷰 목록 조회 및 생성 API")
+@Tag(name = "Review", description = "리뷰 조회, 생성 및 삭제 API")
 @RestController
 @RequestMapping("/api/v1/reviews")
 @RequiredArgsConstructor
@@ -59,7 +55,7 @@ public class ReviewController {
 
     @Operation(
             summary = "리뷰 생성",
-            description = "인증된 회원의 리뷰와 대표 이미지 키 1개, 서브 이미지 키 최대 4개를 저장합니다."
+            description = "인증된 회원의 리뷰를 저장합니다. 대표 이미지 1개와 서브 이미지 최대 4개는 선택 사항입니다."
     )
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
@@ -69,6 +65,7 @@ public class ReviewController {
             @ApiResponse(responseCode = "404", description = "작성자 또는 카테고리를 찾을 수 없음")
     })
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ReviewResponse> create(
             @Valid @RequestBody ReviewRequest reviewRequest,
             @AuthenticationPrincipal Jwt jwt
@@ -76,6 +73,26 @@ public class ReviewController {
         Long memberId = extractMemberId(jwt);
         ReviewResponse review = reviewService.create(reviewRequest, memberId);
         return ResponseEntity.status(HttpStatus.CREATED).body(review);
+    }
+
+    @Operation(summary = "리뷰 삭제", description = "작성자 본인의 리뷰와 연결된 이미지 DB 행을 삭제합니다. 스토리지 객체 삭제는 아직 구현되지 않았습니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "삭제 성공"),
+            @ApiResponse(responseCode = "401", description = "인증 필요"),
+            @ApiResponse(responseCode = "403", description = "리뷰 작성자가 아님"),
+            @ApiResponse(responseCode = "404", description = "리뷰를 찾을 수 없음")
+    })
+    @DeleteMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Void> remove(
+            @PathVariable("id") Long id,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long memberId = extractMemberId(jwt);
+        reviewService.remove(id, memberId);
+
+        return ResponseEntity.noContent().build();
     }
 
     // 서명 검증된 JWT라도 sub가 양수인 회원 ID인지 확인합니다.

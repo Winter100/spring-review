@@ -5,6 +5,7 @@ import com.project.review.member.dtos.MemberSummaryResponse;
 import com.project.review.review.entities.Review;
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -14,7 +15,7 @@ public record ReviewResponse(
         String title,
         CategoryResponse category,
         String content,
-        double rating,
+        BigDecimal rating,
         Instant createdAt,
         String mainImageUrl,
         List<String> subImageUrls,

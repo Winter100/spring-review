@@ -1,18 +1,17 @@
-package com.project.review.common;
+package com.project.review.common.exception;
 
 import com.project.review.common.dtos.CustomErrorResponse;
-import com.project.review.common.exception.BusinessException;
 import com.project.review.member.exception.DuplicateMemberException;
+import com.project.review.member.exception.MemberNotFoundException;
 import com.project.review.member.exception.RefreshTokenException;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseCookie;
-import com.project.review.member.exception.MemberNotFoundException;
 import com.project.review.review.exception.ReviewNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -124,6 +123,12 @@ public class GlobaclExceptionHandler {
         for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
             if (cause instanceof ConstraintViolationException violation) {
                 String constraint = normalizeConstraintName(violation.getConstraintName());
+                // H2는 제약조건 대신 그 제약조건의 인덱스 이름을 반환할 수 있습니다.
+                if ("uk_categories_category".equals(constraint)
+                        || constraint.matches("uk_categories_category_index_[0-9a-f]+")) {
+                    return error(ErrorCode.CATEGORY_ALREADY_EXISTS.getStatus(),
+                            ErrorCode.CATEGORY_ALREADY_EXISTS.getMessage());
+                }
                 if ("uk_members_email".equals(constraint)) {
                     return error(HttpStatus.CONFLICT, "이미 가입된 이메일 입니다.");
                 }

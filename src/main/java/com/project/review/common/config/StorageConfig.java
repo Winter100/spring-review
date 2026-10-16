@@ -1,4 +1,4 @@
-package com.project.review.config;
+package com.project.review.common.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
