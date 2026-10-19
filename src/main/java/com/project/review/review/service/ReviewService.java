@@ -67,7 +67,7 @@ public class ReviewService {
         Category category = categoryService.findById(reviewRequest.categoryId());
 
         // 메인, 서브 이미지 키를 하나의 리스트로 반환
-        List<String> imageKeys = collectImageKeys(reviewRequest);
+        List<String> imageKeys = collectImageKeys(reviewRequest.mainImageKey(), reviewRequest.subImageKeys());
 
         // 요청 이미지 키와 실제 R2 메타데이터 검증
         storageService.validateImagesForReview(imageKeys, memberId);
@@ -137,23 +137,20 @@ public class ReviewService {
         reviewRepository.delete(review);
     }
 
-    // Todo update 로직 만들어야함
-    // 수정으로 인해 필요 없어진 이미지 키를 imageDelete테이블에 등록 해야함
-
     private Review findReviewById(Long reviewId) {
         return reviewRepository.findById(reviewId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.REVIEW_NOT_FOUND));
     }
 
     // 이미지 리스트 키 추출 및 반환
-    private List<String> collectImageKeys(ReviewRequest reviewRequest) {
+    private List<String> collectImageKeys(String mainImageKey, List<String> subImageKeys) {
         List<String> imageKeys = new ArrayList<>();
 
-        if (reviewRequest.mainImageKey() != null) {
-            imageKeys.add(reviewRequest.mainImageKey());
+        if (mainImageKey != null) {
+            imageKeys.add(mainImageKey);
         }
-        if (reviewRequest.subImageKeys() != null) {
-            imageKeys.addAll(reviewRequest.subImageKeys());
+        if (subImageKeys != null) {
+            imageKeys.addAll(subImageKeys);
         }
         if (new HashSet<>(imageKeys).size() != imageKeys.size()) {
             throw new IllegalArgumentException("같은 이미지를 중복 등록할 수 없습니다.");
