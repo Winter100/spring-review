@@ -11,6 +11,8 @@ import com.project.review.review.dtos.ReviewRequest;
 import com.project.review.review.dtos.ReviewResponse;
 import com.project.review.review.entities.Review;
 import com.project.review.review.entities.ReviewImage;
+import com.project.review.review.entities.ReviewImageDelete;
+import com.project.review.review.repository.ReviewImageDeleteRepository;
 import com.project.review.review.repository.ReviewRepository;
 import com.project.review.storage.entities.UploadStatus;
 import com.project.review.storage.repository.ImageUploadRepository;
@@ -30,13 +32,14 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ReviewService {
 
-    private final ReviewRepository reviewRepository;
+    private final TransactionTemplate transactionTemplate;
     private final MemberService memberService;
     private final CategoryService categoryService;
     private final StorageService storageService;
     private final TokenService tokenService;
+    private final ReviewRepository reviewRepository;
     private final ImageUploadRepository imageUploadRepository;
-    private final TransactionTemplate transactionTemplate;
+    private final ReviewImageDeleteRepository reviewImageDeleteRepository;
 
     // 모든 리뷰 조회
     @Transactional(readOnly = true)
@@ -53,7 +56,8 @@ public class ReviewService {
         return toResponse(findReviewById(reviewId));
     }
 
-    /** 리뷰 생성
+    /**
+     * 리뷰 생성
      * 업로드된 이미지의 첨부 가능 여부 및 R2 메타데이터를 검증한 뒤 리뷰 생성
      * 업로드 상태변경 및 리뷰 저장만 하나의 트랜잭션으로 처리
      */
@@ -62,7 +66,7 @@ public class ReviewService {
         Member member = memberService.findById(memberId);
         Category category = categoryService.findById(reviewRequest.categoryId());
 
-        // 요청에서 메인, 서브 이미지 키 추출
+        // 메인, 서브 이미지 키를 하나의 리스트로 반환
         List<String> imageKeys = collectImageKeys(reviewRequest);
 
         // 요청 이미지 키와 실제 R2 메타데이터 검증
@@ -106,19 +110,35 @@ public class ReviewService {
         return toResponse(reviewRepository.save(review));
     }
 
+    /**
+     * 리뷰 삭제
+     * - 요청자와 리뷰 작성자 검증
+     * - 삭제될 리뷰의 이미지 키를 이미지 삭제 예정 테이블에 등록 후 리뷰 삭제
+     */
     @Transactional
     public void remove(Long reviewId, Jwt jwt) {
         Long memberId = tokenService.extractMemberId(jwt);
 
-        Review review = reviewRepository.findForDeleteById(reviewId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.REVIEW_NOT_FOUND));
+        Review review = findReviewById(reviewId);
 
         if (!review.getAuthor().getId().equals(memberId)) {
             throw new BusinessException(ErrorCode.ACCESS_DENIED);
         }
 
+        // 리뷰에서 이미지 키를 받고 삭제 테이블에 맞게 생성
+        List<ReviewImageDelete> deleteImages = collectImageKeys(review).stream()
+                .map(ReviewImageDelete::new)
+                .toList();
+
+        // 이미지 삭제 예정 테이블에 등록
+        reviewImageDeleteRepository.saveAll(deleteImages);
+
+        // 리뷰 삭제
         reviewRepository.delete(review);
     }
+
+    // Todo update 로직 만들어야함
+    // 수정으로 인해 필요 없어진 이미지 키를 imageDelete테이블에 등록 해야함
 
     private Review findReviewById(Long reviewId) {
         return reviewRepository.findById(reviewId)
@@ -142,20 +162,26 @@ public class ReviewService {
         return imageKeys;
     }
 
+    private List<String> collectImageKeys(Review review) {
+        return review.getImages().stream()
+                .map(ReviewImage::getImageKey)
+                .toList();
+    }
 
 
     private ReviewResponse toResponse(Review review) {
         List<ReviewImage> images = review.getImages();
-        String mainImageUrl = images.stream()
+        String mainImageKey = images.stream()
                 .filter(image -> image.getDisplayOrder() == 0)
-                .map(image -> storageService.createReadUrl(image.getImageKey()))
                 .findFirst()
+                .map(ReviewImage::getImageKey)
                 .orElse(null);
-        List<String> subImageUrls = images.stream()
+
+        List<String> subImageKeys = images.stream()
                 .filter(image -> image.getDisplayOrder() > 0)
-                .map(image -> storageService.createReadUrl(image.getImageKey()))
+                .map(ReviewImage::getImageKey)
                 .toList();
 
-        return ReviewResponse.from(review, mainImageUrl, subImageUrls);
+        return ReviewResponse.from(review, mainImageKey, subImageKeys);
     }
 }

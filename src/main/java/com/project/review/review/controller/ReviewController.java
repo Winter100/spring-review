@@ -1,7 +1,5 @@
 package com.project.review.review.controller;
 
-import com.project.review.common.exception.BusinessException;
-import com.project.review.common.exception.ErrorCode;
 import com.project.review.review.dtos.ReviewRequest;
 import com.project.review.review.dtos.ReviewResponse;
 import com.project.review.review.service.ReviewService;
@@ -15,7 +13,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -65,7 +62,6 @@ public class ReviewController {
             @ApiResponse(responseCode = "404", description = "작성자 또는 카테고리를 찾을 수 없음")
     })
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ReviewResponse> create(
             @Valid @RequestBody ReviewRequest reviewRequest,
             @AuthenticationPrincipal Jwt jwt
@@ -83,7 +79,6 @@ public class ReviewController {
             @ApiResponse(responseCode = "404", description = "리뷰를 찾을 수 없음")
     })
     @DeleteMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Void> remove(
             @PathVariable("id") Long id,
             @AuthenticationPrincipal Jwt jwt
