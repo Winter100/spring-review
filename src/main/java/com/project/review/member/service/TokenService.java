@@ -1,14 +1,13 @@
 package com.project.review.member.service;
 
 import com.project.review.common.config.TokenProperties;
+import com.project.review.common.exception.BusinessException;
+import com.project.review.common.exception.ErrorCode;
 import com.project.review.member.entities.Member;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
-import org.springframework.security.oauth2.jwt.JwsHeader;
-import org.springframework.security.oauth2.jwt.JwtClaimsSet;
-import org.springframework.security.oauth2.jwt.JwtEncoder;
-import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.security.oauth2.jwt.*;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -73,6 +72,22 @@ public class TokenService {
             return HexFormat.of().formatHex(hash);
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 algorithm is not available", exception);
+        }
+    }
+
+    // 서명 검증된 JWT라도 sub가 양수인 회원 ID인지 확인합니다.
+    public Long extractMemberId(Jwt jwt) {
+        if (jwt == null) {
+            throw new BusinessException(ErrorCode.INVALID_AUTHENTICATION);
+        }
+        try {
+            long memberId = Long.parseLong(jwt.getSubject());
+            if (memberId <= 0) {
+                throw new BusinessException(ErrorCode.INVALID_AUTHENTICATION);
+            }
+            return memberId;
+        } catch (NumberFormatException ex) {
+            throw new BusinessException(ErrorCode.INVALID_AUTHENTICATION);
         }
     }
 

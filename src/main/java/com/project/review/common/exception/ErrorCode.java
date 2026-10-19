@@ -14,6 +14,7 @@ public enum ErrorCode {
     MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "회원을 찾을 수 없습니다."), // 회원 조회 실패
     INVALID_AUTHENTICATION(HttpStatus.UNAUTHORIZED, "유효하지 않은 회원 인증 정보입니다."),
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."), // 접근 권한 부족
+    IMAGE_UPLOAD_CONFLICT(HttpStatus.CONFLICT, "이미지 업로드 상태 또는 연결 기한이 변경되었습니다."),
     REFRESH_NOT_FOUND(HttpStatus.UNAUTHORIZED, "리프레시 토큰이 없습니다. 다시 로그인해 주세요."),
     REFRESH_UN_VALID(HttpStatus.UNAUTHORIZED, "유효하지 않은 리프레시 토큰입니다. 다시 로그인해 주세요."),
     REFRESH_EXPIRES(HttpStatus.UNAUTHORIZED, "리프레시 토큰이 만료되었습니다. 다시 로그인해 주세요."),

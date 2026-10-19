@@ -1,6 +1,7 @@
 package com.project.review.member.entities;
 
 import com.project.review.review.entities.Review;
+import com.project.review.storage.entities.ImageUploadStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -69,6 +70,9 @@ public class Member {
 
     @OneToMany(mappedBy = "author")
     private List<Review> reviewList = new ArrayList<>();
+
+    @OneToMany(mappedBy = "member")
+    private List<ImageUploadStatus> imageUploadStatusList = new ArrayList<>();
 
     @Builder
     public Member(String email, String nickname, String password) {
