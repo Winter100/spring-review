@@ -7,6 +7,9 @@ import com.project.review.member.repository.MemberRepository;
 import com.project.review.review.dtos.ReviewRequest;
 import com.project.review.review.entities.Review;
 import com.project.review.review.repository.ReviewRepository;
+import com.project.review.storage.entities.ImageUploadStatus;
+import com.project.review.storage.entities.UploadStatus;
+import com.project.review.storage.repository.ImageUploadRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,12 +21,19 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -62,6 +72,10 @@ class ReviewRatingTests {
     private EntityManager entityManager;
     @Autowired
     private ObjectMapper objectMapper;
+    @Autowired
+    private ImageUploadRepository uploads;
+    @MockitoBean
+    private S3Client s3Client;
 
     private Long memberId;
     private Long categoryId;
@@ -110,6 +124,13 @@ class ReviewRatingTests {
 
     @Test
     void returnsPublicImageUrlsWithEstablishedFieldNames() throws Exception {
+        Member member = members.findById(memberId).orElseThrow();
+        for (String key : List.of("reviews/main.png", "reviews/sub.png")) {
+            uploads.save(new ImageUploadStatus(member, key, "image/png", 100L, UploadStatus.PENDING,
+                    Instant.now().plusSeconds(300), Instant.now().plusSeconds(3600)));
+        }
+        when(s3Client.headObject(org.mockito.ArgumentMatchers.<Consumer<HeadObjectRequest.Builder>>any()))
+                .thenReturn(HeadObjectResponse.builder().contentLength(100L).contentType("image/png").build());
         mvc.perform(post("/api/v1/reviews")
                         .with(jwt().jwt(token -> token.subject(memberId.toString())))
                         .contentType(MediaType.APPLICATION_JSON)

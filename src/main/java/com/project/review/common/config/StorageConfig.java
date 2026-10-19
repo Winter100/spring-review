@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
@@ -35,5 +36,23 @@ public class StorageConfig {
                                 .build()
                 )
                 .build(); // S3Presigner 객체 생성
+    }
+
+    @Bean // 반환한 S3Client 객체를 Spring Bean으로 등록
+    public S3Client s3Client(
+            @Value("${storage.endpoint}") String endpoint, // R2 S3 API 주소 (공개 이미지 주소와 다름)
+            @Value("${storage.region}") String region, // 서명 리전
+            @Value("${storage.access-key}") String accessKey, // 접근 키
+            @Value("${storage.secret-key}") String secretKey // 비밀 키
+    ) {
+        return S3Client.builder()
+                .endpointOverride(URI.create(endpoint))
+                .region(Region.of(region)) // R2에서 사용하는 리전
+                .credentialsProvider(
+                        StaticCredentialsProvider.create(
+                                AwsBasicCredentials.create(accessKey, secretKey)
+                        )
+                ) // R2 API 인증 정보 설정
+                .build(); // S3Client 생성 후 Spring Bean으로 등록
     }
 }

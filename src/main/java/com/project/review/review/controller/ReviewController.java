@@ -70,8 +70,7 @@ public class ReviewController {
             @Valid @RequestBody ReviewRequest reviewRequest,
             @AuthenticationPrincipal Jwt jwt
     ) {
-        Long memberId = extractMemberId(jwt);
-        ReviewResponse review = reviewService.create(reviewRequest, memberId);
+        ReviewResponse review = reviewService.create(reviewRequest, jwt);
         return ResponseEntity.status(HttpStatus.CREATED).body(review);
     }
 
@@ -89,25 +88,8 @@ public class ReviewController {
             @PathVariable("id") Long id,
             @AuthenticationPrincipal Jwt jwt
     ) {
-        Long memberId = extractMemberId(jwt);
-        reviewService.remove(id, memberId);
+        reviewService.remove(id, jwt);
 
         return ResponseEntity.noContent().build();
-    }
-
-    // 서명 검증된 JWT라도 sub가 양수인 회원 ID인지 확인합니다.
-    private Long extractMemberId(Jwt jwt) {
-        if (jwt == null) {
-            throw new BusinessException(ErrorCode.INVALID_AUTHENTICATION);
-        }
-        try {
-            long memberId = Long.parseLong(jwt.getSubject());
-            if (memberId <= 0) {
-                throw new BusinessException(ErrorCode.INVALID_AUTHENTICATION);
-            }
-            return memberId;
-        } catch (NumberFormatException ex) {
-            throw new BusinessException(ErrorCode.INVALID_AUTHENTICATION);
-        }
     }
 }
