@@ -68,7 +68,8 @@ public class SecurityConfig {
                                     HttpMethod.POST,
                                     "/api/v1/member",
                                     "/api/v1/member/login",
-                                    "/api/v1/member/refresh"
+                                    "/api/v1/member/refresh",
+                                    "/api/v1/storage/presigned-url"
                             ).permitAll();
 
                     // 콘솔이 비활성화되면 설정 빈도 없으므로 매처를 등록하지 않습니다.
