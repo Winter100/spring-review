@@ -1,13 +1,8 @@
 package com.project.review.review.dtos;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.DecimalMax;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -50,4 +45,9 @@ public record ReviewRequest(
         List<@NotBlank(message = "서브 이미지 키는 비어 있을 수 없습니다.")
         @Size(max = 1024, message = "서브 이미지 키는 최대 1024자입니다.") String> subImageKeys
 ) {
+    @JsonIgnore
+    @AssertTrue(message = "서브 이미지를 등록하려면 대표 이미지가 필요합니다.")
+    public boolean isImageCompositionValid() {
+        return subImageKeys == null || subImageKeys.isEmpty() || mainImageKey != null && !mainImageKey.isBlank();
+    }
 }

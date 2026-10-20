@@ -17,13 +17,13 @@ public record ReviewResponse(
         String content,
         BigDecimal rating,
         Instant createdAt,
-        String mainImageUrl,
-        List<String> subImageUrls,
+        String mainImageKey,
+        List<String> subImageKeys,
         MemberSummaryResponse author
 ) {
 
     // 공개 URL 생성은 서비스가 담당하고, DTO는 응답 필드 변환만 수행합니다.
-    public static ReviewResponse from(Review review, String mainImageUrl, List<String> subImageUrls) {
+    public static ReviewResponse from(Review review, String mainImageKey, List<String> subImageKeys) {
         return new ReviewResponse(
                 review.getId(),
                 review.getTitle(),
@@ -31,8 +31,8 @@ public record ReviewResponse(
                 review.getContent(),
                 review.getRating(),
                 review.getCreatedAt(),
-                mainImageUrl,
-                subImageUrls,
+                mainImageKey,
+                subImageKeys,
                 MemberSummaryResponse.from(review.getAuthor())
         );
     }

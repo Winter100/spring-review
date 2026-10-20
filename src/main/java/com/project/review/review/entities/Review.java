@@ -10,6 +10,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -17,17 +18,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-
-/**
- * 리뷰 엔티티
- * - 아이디
- * - 제목
- * - 내용
- * - 점수
- * - 작성자
- * - 이미지 최대 5장
- * -
- */
 
 @Entity
 @Table(name = "reviews")
@@ -38,6 +28,11 @@ public class Review {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Version
+    @Column(nullable = false)
+    @ColumnDefault("0")
+    private Long version;
 
     @Column(nullable = false)
     @Size(min = 1, max = 30)
@@ -77,6 +72,10 @@ public class Review {
         images.add(new ReviewImage(this, imageKey, displayOrder));
     }
 
+    public void clearImages(){
+        images.clear();
+    }
+
     @Builder
     public Review(String title, String content, BigDecimal rating, Member author, Category category) {
         this.title = title;
@@ -85,4 +84,13 @@ public class Review {
         this.author = author;
         this.category = category;
     }
+
+    public void updateDetails(String title, String content, BigDecimal rating, Category category){
+        this.title = title;
+        this.content = content;
+        this.rating = rating;
+        this.category = category;
+    }
+
+
 }
