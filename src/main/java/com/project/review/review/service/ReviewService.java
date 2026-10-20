@@ -7,6 +7,7 @@ import com.project.review.common.exception.ErrorCode;
 import com.project.review.member.entities.Member;
 import com.project.review.member.service.MemberService;
 import com.project.review.member.service.TokenService;
+import com.project.review.review.dtos.ReviewPageResponse;
 import com.project.review.review.dtos.ReviewRequest;
 import com.project.review.review.dtos.ReviewResponse;
 import com.project.review.review.dtos.ReviewUpdateRequest;
@@ -15,11 +16,12 @@ import com.project.review.review.entities.ReviewImage;
 import com.project.review.review.entities.ReviewImageDelete;
 import com.project.review.review.repository.ReviewImageDeleteRepository;
 import com.project.review.review.repository.ReviewRepository;
-import com.project.review.storage.repository.ImageUploadRepository;
 import com.project.review.storage.service.StorageService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,19 +43,26 @@ public class ReviewService {
     private final StorageService storageService;
     private final TokenService tokenService;
     private final ReviewRepository reviewRepository;
-    private final ImageUploadRepository imageUploadRepository;
     private final ReviewImageDeleteRepository reviewImageDeleteRepository;
 
     /**
-     *  모든 리뷰 조회
-     *  Todo:(메인 페이지) 실제 목록에 맞춰 toResponse 수정, 레퍼지토리 수정하기
+     * 1부터 시작하는 요청 페이지를 JPA의 0 기반 페이지로 변환합니다.
      */
     @Transactional(readOnly = true)
-    public List<ReviewResponse> findAll() {
-        return reviewRepository.findAll()
-                .stream()
-                .map(this::toResponse)
-                .toList();
+    public ReviewPageResponse findAll(int page, int size) {
+        if (page < 1) {
+            throw new IllegalArgumentException("페이지는 1 이상이어야 합니다.");
+        }
+        if (size < 1 || size > 100) {
+            throw new IllegalArgumentException("페이지 크기는 1 이상 100 이하여야 합니다.");
+        }
+
+        PageRequest pageable = PageRequest.of(
+                page - 1,
+                size,
+                Sort.by(Sort.Direction.DESC, "createdAt", "id")
+        );
+        return ReviewPageResponse.from(reviewRepository.findAllSummaries(pageable));
     }
 
     /**
