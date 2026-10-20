@@ -2,6 +2,7 @@ package com.project.review.review.controller;
 
 import com.project.review.review.dtos.ReviewRequest;
 import com.project.review.review.dtos.ReviewResponse;
+import com.project.review.review.dtos.ReviewUpdateRequest;
 import com.project.review.review.service.ReviewService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -68,6 +69,16 @@ public class ReviewController {
     ) {
         ReviewResponse review = reviewService.create(reviewRequest, jwt);
         return ResponseEntity.status(HttpStatus.CREATED).body(review);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Void> update(
+            @PathVariable("id") Long id,
+            @Valid @RequestBody ReviewUpdateRequest reviewUpdateRequest,
+            @AuthenticationPrincipal Jwt jwt
+            ){
+        reviewService.update(id, reviewUpdateRequest, jwt);
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "리뷰 삭제", description = "작성자 본인의 리뷰와 연결된 이미지 DB 행을 삭제합니다. 스토리지 객체 삭제는 아직 구현되지 않았습니다.")

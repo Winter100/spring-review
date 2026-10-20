@@ -1,8 +1,11 @@
 package com.project.review.storage.service;
 
+import com.project.review.common.exception.BusinessException;
+import com.project.review.common.exception.ErrorCode;
 import com.project.review.member.entities.Member;
 import com.project.review.member.service.MemberService;
 import com.project.review.storage.constant.ImageContentType;
+import com.project.review.storage.dtos.ImageUploadBatchRequest;
 import com.project.review.storage.dtos.ImageUploadRequest;
 import com.project.review.storage.dtos.ImageUploadResponse;
 import com.project.review.storage.dtos.UploadVerification;
@@ -24,9 +27,7 @@ import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignReques
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.HashSet;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Service // Presigned URL 발급 비즈니스 로직
 @RequiredArgsConstructor // S3Presigner 생성자 주입
@@ -45,54 +46,69 @@ public class StorageService {
     private String publicBaseUrl; // R2 공개 개발 URL 또는 버킷에 연결된 사용자 도메인
 
     @Transactional
-    public ImageUploadResponse uploadUrl(ImageUploadRequest imageUploadRequest, Long memberId) {
+    public List<ImageUploadResponse> uploadUrls(ImageUploadBatchRequest batchRequest, Long memberId) {
 
-        String contentType = imageUploadRequest.contentType();
-        Long fileSize = imageUploadRequest.fileSize();
-
-        // 지원하는 이미지 MIME 타입만 허용, 파일 사이즈는 dto로 일단 검증
-        if (contentType == null || !ImageContentType.ALLOWED.contains(contentType)) {
-            throw new IllegalArgumentException("지원하지 않는 이미지 형식입니다.");
-        }
-
-        // UUID로 충돌 가능성이 매우 낮은 객체 키 생성
-        String key = "reviews/" + UUID.randomUUID();
-
+        List<ImageUploadResponse> responseList = new ArrayList<>();
+        List<ImageUploadStatus> imageUploadStatusList = new ArrayList<>();
         Member member = memberService.findById(memberId);
         Instant now = Instant.now();
         Instant attachExpiresAt = now.plus(Duration.ofHours(1));
 
-        // 업로드할 버킷, 객체 키, MIME 타입 정의
-        PutObjectRequest putRequest = PutObjectRequest.builder()
-                .bucket(bucket) // 저장 대상 버킷
-                .key(key) // 이미지 객체 키
-                .contentType(contentType) // 업로드 요청에 사용할 MIME 타입
-                .build();
+        for(ImageUploadRequest request: batchRequest.images()){
 
-        // Presigned URL의 유효시간과 요청 조건 정의
-        PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
-                .signatureDuration(Duration.ofMinutes(5)) // 유효기간 5분
-                .putObjectRequest(putRequest) // PUT 업로드 요청 지정
-                .build();
+            checkContentTypeAndFileSize(request.contentType(), request.fileSize());
 
-        // 서명된 업로드 URL 생성
-        PresignedPutObjectRequest presignedRequest = resigned.presignPutObject(presignRequest);
-        String url = presignedRequest.url().toString();
+            // UUID로 충돌 가능성이 매우 낮은 객체 키 생성
+            String key = "reviews/" + UUID.randomUUID();
 
-        // 발급 조건과 실제 서명 만료 시각을 저장합니다.
-        ImageUploadStatus imageUploadStatus = new ImageUploadStatus(
-                member,
-                key,
-                contentType,
-                fileSize,
-                UploadStatus.PENDING,
-                presignedRequest.expiration(),
-                attachExpiresAt
-        );
-        imageUploadRepository.save(imageUploadStatus);
+            // 업로드할 버킷, 객체 키, MIME 타입 정의
+            PutObjectRequest putRequest = PutObjectRequest.builder()
+                    .bucket(bucket) // 저장 대상 버킷
+                    .key(key) // 이미지 객체 키
+                    .contentType(request.contentType()) // 업로드 요청에 사용할 MIME 타입
+                    .build();
+
+            // Presigned URL의 유효시간과 요청 조건 정의
+            PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
+                    .signatureDuration(Duration.ofMinutes(5)) // 유효기간 5분
+                    .putObjectRequest(putRequest) // PUT 업로드 요청 지정
+                    .build();
+
+            // 서명된 업로드 URL 생성
+            PresignedPutObjectRequest presignedRequest = resigned.presignPutObject(presignRequest);
+            String url = presignedRequest.url().toString();
+
+            // 발급 조건과 실제 서명 만료 시각을 저장합니다.
+            ImageUploadStatus imageUploadStatus = new ImageUploadStatus(
+                    member,
+                    key,
+                    request.contentType(),
+                    request.fileSize(),
+                    UploadStatus.PENDING,
+                    presignedRequest.expiration(),
+                    attachExpiresAt
+            );
+
+            responseList.add(new ImageUploadResponse(url, key));
+            imageUploadStatusList.add(imageUploadStatus);
+        }
+
+        imageUploadRepository.saveAll(imageUploadStatusList);
 
         // 업로드 URL과 객체 키 반환
-        return new ImageUploadResponse(url, key);
+        return responseList;
+    }
+
+    private void checkContentTypeAndFileSize(String contentType, Long fileSize){
+        // 지원하는 이미지 MIME 타입만 허용
+        if (contentType == null || !ImageContentType.ALLOWED.contains(contentType)) {
+            throw new IllegalArgumentException("지원하지 않는 이미지 형식입니다.");
+        }
+
+        // 파일 사이즈 확인
+        if(fileSize > 5 * 1024 * 1024){
+            throw new IllegalArgumentException("최대 5MB까지 가능합니다.");
+        }
     }
 
     public void validateImagesForReview(List<String> imageKeys, Long memberId) {
@@ -106,6 +122,15 @@ public class StorageService {
         }
     }
 
+    public void attachIfPending(List<String> imageKeys, Long memberId){
+        for (String key : imageKeys.stream().sorted().toList()) {
+            int updated = imageUploadRepository.attachIfPending(
+                    key, memberId, Instant.now(), UploadStatus.PENDING, UploadStatus.ATTACHED);
+            if (updated != 1) {
+                throw new BusinessException(ErrorCode.IMAGE_UPLOAD_CONFLICT);
+            }
+        }
+    }
     /**
      * 이미지 테이블과 키, 본인, 기한 등 확인
      */
@@ -152,6 +177,7 @@ public class StorageService {
 
     private void validateUploadedObjects(List<UploadVerification> uploads) {
         // Todo 실패 하면 이미지 삭제 해야함.
+        // 바로 삭제하지말고 이미지 삭제 테이블에 키 등록하기?
         for (UploadVerification upload : uploads) {
             HeadObjectResponse object = s3Client.headObject(builder -> builder
                     .bucket(bucket)
