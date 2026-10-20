@@ -15,6 +15,10 @@ spring:
     url: jdbc:postgresql://localhost:5432/review_db # Docker PostgreSQL 접속 주소
     username: review # POSTGRES_USER와 동일
     password: ${POSTGRES_PASSWORD}
+  data:
+    web:
+      pageable:
+        max-page-size: 100
 
   jpa:
     hibernate:

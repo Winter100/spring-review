@@ -1,6 +1,7 @@
 package com.project.review.review.controller;
 
 import com.project.review.review.dtos.ReviewRequest;
+import com.project.review.review.dtos.ReviewPageResponse;
 import com.project.review.review.dtos.ReviewResponse;
 import com.project.review.review.dtos.ReviewUpdateRequest;
 import com.project.review.review.service.ReviewService;
@@ -18,8 +19,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @Tag(name = "Review", description = "리뷰 조회, 생성 및 삭제 API")
 @RestController
 @RequestMapping("/api/v1/reviews")
@@ -28,14 +27,13 @@ public class ReviewController {
 
     private final ReviewService reviewService;
 
-    @Operation(
-            summary = "모든 리뷰 조회",
-            description = "인증 없이 모든 리뷰와 공개 이미지 URL을 조회합니다. 리뷰가 없으면 빈 배열을 반환합니다."
-    )
-    @ApiResponse(responseCode = "200", description = "조회 성공")
+    @Operation(summary = "리뷰 목록 조회", description = "페이지는 1부터 시작하며, 최신순으로 조회합니다. 페이지 크기는 1~100입니다.")
     @GetMapping
-    public ResponseEntity<List<ReviewResponse>> findAll() {
-        return ResponseEntity.ok(reviewService.findAll());
+    public ResponseEntity<ReviewPageResponse> findAll(
+            @RequestParam(name = "page", defaultValue = "1") int page,
+            @RequestParam(name = "size", defaultValue = "50") int size
+    ) {
+        return ResponseEntity.ok(reviewService.findAll(page, size));
     }
 
     @Operation(summary = "리뷰 상세 조회", description = "인증 없이 리뷰 ID로 조회합니다.")
