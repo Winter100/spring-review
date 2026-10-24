@@ -19,11 +19,12 @@ public record ReviewResponse(
         Instant createdAt,
         String mainImageKey,
         List<String> subImageKeys,
-        MemberSummaryResponse author
+        MemberSummaryResponse author,
+        long viewCount
 ) {
 
     // 공개 URL 생성은 서비스가 담당하고, DTO는 응답 필드 변환만 수행합니다.
-    public static ReviewResponse from(Review review, String mainImageKey, List<String> subImageKeys) {
+    public static ReviewResponse from(Review review, String mainImageKey, List<String> subImageKeys, long viewCount) {
         return new ReviewResponse(
                 review.getId(),
                 review.getTitle(),
@@ -33,7 +34,8 @@ public record ReviewResponse(
                 review.getCreatedAt(),
                 mainImageKey,
                 subImageKeys,
-                MemberSummaryResponse.from(review.getAuthor())
+                MemberSummaryResponse.from(review.getAuthor()),
+                viewCount
         );
     }
 }

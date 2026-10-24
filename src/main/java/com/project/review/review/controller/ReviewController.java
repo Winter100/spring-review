@@ -11,13 +11,19 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.Duration;
+import java.util.UUID;
 
 @Tag(name = "Review", description = "리뷰 조회, 생성 및 삭제 API")
 @RestController
@@ -36,7 +42,7 @@ public class ReviewController {
         return ResponseEntity.ok(reviewService.findAll(page, size));
     }
 
-    @Operation(summary = "리뷰 상세 조회", description = "인증 없이 리뷰 ID로 조회합니다.")
+    @Operation(summary = "리뷰 상세 조회", description = "인증 없이 조회합니다. 방문자 쿠키 기준으로 한국 시간 하루 1회 조회수가 증가합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "400", description = "ID가 Long으로 변환할 수 없는 형식"),
@@ -44,9 +50,28 @@ public class ReviewController {
     })
     @GetMapping("/{id}")
     public ResponseEntity<ReviewResponse> findById(
-            @Parameter(description = "리뷰 ID", example = "1") @PathVariable("id") Long id
+            @Parameter(description = "리뷰 ID", example = "1") @PathVariable("id") Long id,
+            @CookieValue(name = "reviewVisitorId", required = false) String visitorCookie,
+            HttpServletRequest request
     ) {
-        return ResponseEntity.ok().body(reviewService.findById(id));
+        UUID visitorId = parseVisitorId(visitorCookie);
+        boolean issueCookie = visitorId == null;
+        if (issueCookie) {
+            visitorId = UUID.randomUUID();
+        }
+        ReviewResponse review = reviewService.findByIdAndCountView(id, visitorId);
+        ResponseEntity.BodyBuilder response = ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store");
+        if (issueCookie) {
+            ResponseCookie cookie = ResponseCookie.from("reviewVisitorId", visitorId.toString())
+                    .httpOnly(true)
+                    .secure(request.isSecure())
+                    .sameSite("Lax")
+                    .path("/")
+                    .maxAge(Duration.ofDays(365))
+                    .build();
+            response.header(HttpHeaders.SET_COOKIE, cookie.toString());
+        }
+        return response.body(review);
     }
 
     @Operation(
@@ -95,5 +120,17 @@ public class ReviewController {
         reviewService.remove(id, jwt);
 
         return ResponseEntity.noContent().build();
+    }
+
+    private UUID parseVisitorId(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            UUID visitorId = UUID.fromString(value);
+            return visitorId.toString().equalsIgnoreCase(value) ? visitorId : null;
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
     }
 }

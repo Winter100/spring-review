@@ -10,16 +10,19 @@ import com.project.review.member.service.TokenService;
 import com.project.review.review.dtos.ReviewPageResponse;
 import com.project.review.review.dtos.ReviewRequest;
 import com.project.review.review.dtos.ReviewResponse;
+import com.project.review.review.dtos.ReviewSummaryResponse;
 import com.project.review.review.dtos.ReviewUpdateRequest;
 import com.project.review.review.entities.Review;
 import com.project.review.review.entities.ReviewImage;
 import com.project.review.review.entities.ReviewImageDelete;
 import com.project.review.review.repository.ReviewImageDeleteRepository;
 import com.project.review.review.repository.ReviewRepository;
+import com.project.review.review.repository.ReviewViewRepository;
 import com.project.review.storage.service.StorageService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -27,10 +30,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -44,6 +52,8 @@ public class ReviewService {
     private final TokenService tokenService;
     private final ReviewRepository reviewRepository;
     private final ReviewImageDeleteRepository reviewImageDeleteRepository;
+    private final ReviewViewRepository reviewViewRepository;
+    private final Clock reviewViewClock;
 
     /**
      * 1부터 시작하는 요청 페이지를 JPA의 0 기반 페이지로 변환합니다.
@@ -62,7 +72,11 @@ public class ReviewService {
                 size,
                 Sort.by(Sort.Direction.DESC, "createdAt", "id")
         );
-        return ReviewPageResponse.from(reviewRepository.findAllSummaries(pageable));
+        Page<ReviewSummaryResponse> reviews = reviewRepository.findAllSummaries(pageable);
+        Map<Long, Long> counts = reviewViewRepository.findCounts(
+                reviews.getContent().stream().map(ReviewSummaryResponse::id).toList());
+        return ReviewPageResponse.from(reviews.map(review ->
+                review.withViewCount(counts.getOrDefault(review.id(), 0L))));
     }
 
     /**
@@ -71,6 +85,17 @@ public class ReviewService {
     @Transactional(readOnly = true)
     public ReviewResponse findById(Long reviewId) {
         return toResponse(findReviewById(reviewId));
+    }
+
+    /** 방문 기록과 누적 증가를 같은 트랜잭션으로 처리합니다. */
+    @Transactional
+    public ReviewResponse findByIdAndCountView(Long reviewId, UUID visitorId) {
+        Review review = findReviewById(reviewId);
+        LocalDate date = LocalDate.now(reviewViewClock.withZone(ZoneId.of("Asia/Seoul")));
+        if (reviewViewRepository.insertDailyView(reviewId, visitorId, date)) {
+            reviewViewRepository.increment(reviewId);
+        }
+        return toResponse(review);
     }
 
     /**
@@ -271,6 +296,6 @@ public class ReviewService {
                 .map(ReviewImage::getImageKey)
                 .toList();
 
-        return ReviewResponse.from(review, mainImageKey, subImageKeys);
+        return ReviewResponse.from(review, mainImageKey, subImageKeys, reviewViewRepository.findCount(review.getId()));
     }
 }
