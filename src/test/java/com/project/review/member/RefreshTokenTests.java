@@ -1,10 +1,10 @@
 package com.project.review.member;
 
 import com.project.review.member.entities.Member;
-import com.project.review.member.entities.RefreshToken;
+import com.project.review.auth.entities.RefreshToken;
 import com.project.review.member.repository.MemberRepository;
-import com.project.review.member.repository.RefreshTokenRepository;
-import com.project.review.member.service.TokenService;
+import com.project.review.auth.repository.RefreshTokenRepository;
+import com.project.review.auth.service.TokenService;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,6 +16,11 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.jwt.JwsHeader;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
 
@@ -33,6 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.datasource.username=sa",
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop",
+        "security.jwt.issuer=project-review",
         "security.jwt.secret-base64=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
         "security.jwt.access-token-expires-minutes=15",
         "security.jwt.refresh-token-expires-days=7",
@@ -58,6 +64,8 @@ class RefreshTokenTests {
     @Autowired
     private JwtDecoder jwtDecoder;
     @Autowired
+    private JwtEncoder jwtEncoder;
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     private Member member;
@@ -78,7 +86,7 @@ class RefreshTokenTests {
         String refreshToken = saveToken(Instant.now().plusSeconds(3600));
         Instant originalExpiry = tokens.findAll().getFirst().getExpiresAt();
 
-        String body = mvc.perform(post("/api/v1/member/refresh")
+        String body = mvc.perform(post("/api/v1/auth/refresh")
                         .cookie(new Cookie("refreshToken", refreshToken)))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
@@ -111,7 +119,7 @@ class RefreshTokenTests {
 
     @Test
     void missingCookieReturns401AndClearsCookie() throws Exception {
-        mvc.perform(post("/api/v1/member/refresh"))
+        mvc.perform(post("/api/v1/auth/refresh"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.message").value("리프레시 토큰이 없습니다. 다시 로그인해 주세요."))
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Max-Age=0")));
@@ -152,8 +160,114 @@ class RefreshTokenTests {
     }
 
     @Test
+    void bearerRejectsMissingAndUnknownTokenTypes() throws Exception {
+        for (String type : new String[]{null, "unknown"}) {
+            String token = signedToken(type, Instant.now().plusSeconds(3600));
+            mvc.perform(post("/api/v1/reviews")
+                            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                    .andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Test
+    void refreshRejectsRegisteredTokensWithWrongOrMissingType() throws Exception {
+        for (String type : new String[]{"access", "unknown", null}) {
+            String token = signedToken(type, Instant.now().plusSeconds(3600));
+            RefreshToken stored = tokens.save(new RefreshToken(
+                    member, tokenService.hashRefreshToken(token), Instant.now().plusSeconds(3600)));
+            expectRejected(token, "유효하지 않은 리프레시 토큰입니다. 다시 로그인해 주세요.");
+            assertThat(tokens.existsById(stored.getId())).isTrue();
+            tokens.delete(stored);
+        }
+    }
+
+    @Test
+    void expiredJwtDeletesTokenEvenWhenDatabaseExpiryIsInFuture() throws Exception {
+        String token = signedToken("refresh", Instant.now().minusSeconds(1));
+        tokens.save(new RefreshToken(
+                member, tokenService.hashRefreshToken(token), Instant.now().plusSeconds(3600)));
+
+        expectRejected(token, "리프레시 토큰이 만료되었습니다. 다시 로그인해 주세요.");
+
+        assertThat(tokens.count()).isZero();
+    }
+
+    @Test
+    void refreshRejectsTokenWithoutExpiry() throws Exception {
+        String token = signedToken("refresh", null);
+        tokens.save(new RefreshToken(
+                member, tokenService.hashRefreshToken(token), Instant.now().plusSeconds(3600)));
+
+        expectRejected(token, "유효하지 않은 리프레시 토큰입니다. 다시 로그인해 주세요.");
+
+        assertThat(tokens.count()).isEqualTo(1);
+    }
+
+    @Test
+    void refreshRejectsWrongIssuerAndFutureNotBefore() throws Exception {
+        Instant now = Instant.now();
+        JwtClaimsSet wrongIssuer = JwtClaimsSet.builder()
+                .issuer("other-issuer")
+                .subject(member.getId().toString())
+                .claim("token_type", "refresh")
+                .expiresAt(now.plusSeconds(3600))
+                .build();
+        JwtClaimsSet futureToken = JwtClaimsSet.builder()
+                .issuer("project-review")
+                .subject(member.getId().toString())
+                .claim("token_type", "refresh")
+                .notBefore(now.plusSeconds(1800))
+                .expiresAt(now.plusSeconds(3600))
+                .build();
+
+        for (JwtClaimsSet claims : new JwtClaimsSet[]{wrongIssuer, futureToken}) {
+            String token = encodeToken(claims);
+            RefreshToken stored = tokens.save(new RefreshToken(
+                    member, tokenService.hashRefreshToken(token), now.plusSeconds(3600)));
+            expectRejected(token, "유효하지 않은 리프레시 토큰입니다. 다시 로그인해 주세요.");
+            assertThat(tokens.existsById(stored.getId())).isTrue();
+            tokens.delete(stored);
+        }
+    }
+
+    @Test
+    void refreshRejectsInvalidSignatureEvenWhenHashIsRegistered() throws Exception {
+        String token = tokenService.createRefreshToken(member);
+        int signatureStart = token.lastIndexOf('.') + 1;
+        char replacement = token.charAt(signatureStart) == 'A' ? 'B' : 'A';
+        String tamperedToken = token.substring(0, signatureStart)
+                + replacement + token.substring(signatureStart + 1);
+        tokens.save(new RefreshToken(
+                member, tokenService.hashRefreshToken(tamperedToken), Instant.now().plusSeconds(3600)));
+
+        expectRejected(tamperedToken, "유효하지 않은 리프레시 토큰입니다. 다시 로그인해 주세요.");
+
+        assertThat(tokens.count()).isEqualTo(1);
+    }
+
+    private String signedToken(String type, Instant expiresAt) {
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
+                .issuer("project-review")
+                .subject(member.getId().toString())
+                .issuedAt(Instant.now().minusSeconds(60));
+        if (type != null) {
+            claims.claim("token_type", type);
+        }
+        if (expiresAt != null) {
+            claims.expiresAt(expiresAt);
+        }
+        return encodeToken(claims.build());
+    }
+
+    private String encodeToken(JwtClaimsSet claims) {
+        return jwtEncoder.encode(JwtEncoderParameters.from(
+                JwsHeader.with(MacAlgorithm.HS256).build(), claims)).getTokenValue();
+    }
+
+    @Test
     void secureRequestClearsCookieWithMatchingAttributes() throws Exception {
-        mvc.perform(post("/api/v1/member/refresh").secure(true))
+        mvc.perform(post("/api/v1/auth/refresh").secure(true))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Secure")))
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("HttpOnly")))
@@ -181,7 +295,7 @@ class RefreshTokenTests {
         Cookie refreshCookie = login.getCookie("refreshToken");
         assertThat(refreshCookie).isNotNull();
         assertThat(refreshCookie.getMaxAge()).isEqualTo(7 * 24 * 60 * 60);
-        mvc.perform(post("/api/v1/member/refresh").cookie(refreshCookie))
+        mvc.perform(post("/api/v1/auth/refresh").cookie(refreshCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isString());
     }
@@ -263,7 +377,7 @@ class RefreshTokenTests {
     }
 
     private void expectRejected(String token, String message) throws Exception {
-        mvc.perform(post("/api/v1/member/refresh").cookie(new Cookie("refreshToken", token)))
+        mvc.perform(post("/api/v1/auth/refresh").cookie(new Cookie("refreshToken", token)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Max-Age=0")))

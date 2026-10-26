@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -66,13 +67,19 @@ public class AuthService {
     @Transactional(noRollbackFor = RefreshTokenException.class)
     public String refreshAccessToken(String refreshToken){
         isBlankTokenOrElseThrow(refreshToken);
+        Jwt jwt = tokenService.decodeRefreshToken(refreshToken);
+        Instant now = Instant.now();
+        if (jwt.getExpiresAt() == null
+                || (jwt.getNotBefore() != null && jwt.getNotBefore().isAfter(now))) {
+            throw new RefreshTokenException(ErrorCode.REFRESH_UN_VALID);
+        }
 
         // 서버가 발급하고 DB에 등록한 원문과 일치하는 토큰만 허용합니다.
         RefreshToken storedToken = refreshTokenRepository
                 .findByTokenHash(tokenService.hashRefreshToken(refreshToken))
                 .orElseThrow(() -> new RefreshTokenException(ErrorCode.REFRESH_UN_VALID));
 
-        if (!storedToken.getExpiresAt().isAfter(Instant.now())) {
+        if (!jwt.getExpiresAt().isAfter(now) || !storedToken.getExpiresAt().isAfter(now)) {
             refreshTokenRepository.delete(storedToken);
             throw new RefreshTokenException(ErrorCode.REFRESH_EXPIRES);
         }

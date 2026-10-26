@@ -4,7 +4,8 @@ import com.project.review.common.config.TokenProperties;
 import com.project.review.common.exception.BusinessException;
 import com.project.review.common.exception.ErrorCode;
 import com.project.review.member.entities.Member;
-import lombok.RequiredArgsConstructor;
+import com.project.review.member.exception.RefreshTokenException;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
@@ -20,13 +21,31 @@ import java.util.Objects;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class TokenService {
 
     @Value("${security.jwt.issuer}")
     private String issuer;
     private final JwtEncoder jwtEncoder;
     private final TokenProperties tokenProperties;
+    private final JwtDecoder refreshTokenDecoder;
+
+    public TokenService(
+            JwtEncoder jwtEncoder,
+            TokenProperties tokenProperties,
+            @Qualifier("refreshTokenDecoder") JwtDecoder refreshTokenDecoder
+    ) {
+        this.jwtEncoder = jwtEncoder;
+        this.tokenProperties = tokenProperties;
+        this.refreshTokenDecoder = refreshTokenDecoder;
+    }
+
+    public Jwt decodeRefreshToken(String refreshToken) {
+        try {
+            return refreshTokenDecoder.decode(refreshToken);
+        } catch (JwtException exception) {
+            throw new RefreshTokenException(ErrorCode.REFRESH_UN_VALID);
+        }
+    }
 
     public String createAccessToken(Member member) {
         Instant now = Instant.now();
@@ -35,6 +54,7 @@ public class TokenService {
                 .issuer(issuer)
                 .subject(member.getId().toString())
                 .claim("role", member.getRole().name())
+                .claim("token_type","access")
                 .id(UUID.randomUUID().toString())
                 .issuedAt(now)
                 .expiresAt(now.plus(tokenProperties.accessTokenExpiresMinutes(), ChronoUnit.MINUTES))
@@ -52,8 +72,7 @@ public class TokenService {
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(issuer)
                 .subject(member.getId().toString())
-                .claim("token_use", "refresh")
-                // 같은 회원이 연속 로그인해도 서로 다른 토큰을 발급합니다.
+                .claim("token_type", "refresh")
                 .id(UUID.randomUUID().toString())
                 .issuedAt(now)
                 .expiresAt(now.plus(tokenProperties.refreshTokenExpiresDays(), ChronoUnit.DAYS))
