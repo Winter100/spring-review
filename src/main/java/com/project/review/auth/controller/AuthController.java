@@ -1,12 +1,8 @@
 package com.project.review.auth.controller;
 
-import com.project.review.auth.dtos.LoginRequest;
-import com.project.review.auth.dtos.LoginResponse;
-import com.project.review.auth.dtos.LoginResult;
-import com.project.review.auth.dtos.SignupRequest;
+import com.project.review.auth.dtos.*;
 import com.project.review.auth.service.AuthService;
 import com.project.review.member.dtos.MemberResponse;
-import com.project.review.auth.dtos.TokenResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +11,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.Duration;
+import java.time.Instant;
 
 /**
  * Auth 에서 하는 것
@@ -43,8 +42,8 @@ public class AuthController {
                 .httpOnly(true)
                 .secure(request.isSecure())
                 .sameSite("Lax")
-                .path("/api")
-                .maxAge(result.refreshTokenExpiresDuration())
+                .path("/api/v1/auth")
+                .maxAge(result.lifetime())
                 .build();
 
         return ResponseEntity.ok()
@@ -66,14 +65,17 @@ public class AuthController {
     // 로그아웃
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
+            @CookieValue(name="refreshToken", required = false) String refreshToken,
             HttpServletRequest request
     ){
-        // Todo Db 리프레쉬 토큰이 삭제 되어야함.
+
+        authService.logout(refreshToken);
+
         ResponseCookie cookie = ResponseCookie.from("refreshToken", "")
                 .httpOnly(true)
                 .secure(request.isSecure())
                 .sameSite("Lax")
-                .path("/api/v1")
+                .path("/api/v1/auth")
                 .maxAge(0)
                 .build();
 
@@ -86,10 +88,23 @@ public class AuthController {
     // 리프레쉬를 통한 토큰 재발급
     @PostMapping("refresh")
     public ResponseEntity<TokenResponse> renewToken(
-            @CookieValue(name = "refreshToken" , required = false) String refreshToken
+            @CookieValue(name = "refreshToken" , required = false) String refreshToken,
+            HttpServletRequest request
     ){
+        RefreshResult result = authService.refreshAccessToken(refreshToken);
+
+        ResponseCookie cookie = ResponseCookie
+                .from("refreshToken", result.newRefreshToken())
+                .httpOnly(true)
+                .secure(request.isSecure())
+                .sameSite("Lax")
+                .path("/api/v1/auth")
+                .maxAge(Duration.between(Instant.now(), result.expiresAt()))
+                .build();
+
         return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .header(HttpHeaders.CACHE_CONTROL, "no-store")
-                .body(new TokenResponse(authService.refreshAccessToken(refreshToken)));
+                .body(new TokenResponse(result.accessToken()));
     }
 }

@@ -7,6 +7,6 @@ import java.time.Duration;
 public record LoginResult(
         String accessToken,
         String refreshToken,
-        Duration refreshTokenExpiresDuration,
+        Duration lifetime,
         Member member)
 {}

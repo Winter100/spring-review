@@ -43,7 +43,7 @@ public class TokenService {
         try {
             return refreshTokenDecoder.decode(refreshToken);
         } catch (JwtException exception) {
-            throw new RefreshTokenException(ErrorCode.REFRESH_UN_VALID);
+            throw new RefreshTokenException(ErrorCode.REFRESH_INVALID);
         }
     }
 
@@ -68,20 +68,30 @@ public class TokenService {
 
     // Todo 로그인할때마다 리프레쉬 토큰이 생성됨. 리존 리프레쉬 토큰 만료 설정하기
     public String createRefreshToken(Member member) {
-        Instant now = Instant.now();
+        Instant expiresAt = Instant.now().plus(
+                tokenProperties.refreshTokenExpiresDays(),
+                ChronoUnit.DAYS
+        );
+
+        return createRefreshToken(member, expiresAt);
+    }
+
+    public String createRefreshToken(Member member, Instant expiresAt){
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(issuer)
                 .subject(member.getId().toString())
                 .claim("token_type", "refresh")
                 .id(UUID.randomUUID().toString())
-                .issuedAt(now)
-                .expiresAt(now.plus(tokenProperties.refreshTokenExpiresDays(), ChronoUnit.DAYS))
+                .issuedAt(Instant.now())
+                .expiresAt(expiresAt)
                 .build();
 
         JwsHeader jwsHeader = JwsHeader.with(MacAlgorithm.HS256).build();
+
         return jwtEncoder.encode(JwtEncoderParameters.from(jwsHeader, claims))
                 .getTokenValue();
     }
+
 
     public String hashRefreshToken(String refreshToken) {
         Objects.requireNonNull(refreshToken, "refreshToken must not be null");

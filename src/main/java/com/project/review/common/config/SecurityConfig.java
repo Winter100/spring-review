@@ -72,11 +72,9 @@ public class SecurityConfig {
                             ).permitAll()
                             .requestMatchers(
                                     HttpMethod.POST,
-                                    "/api/v1/member",
-                                    "/api/v1/member/login",
-                                    "/api/v1/member/refresh",
                                     "/api/v1/auth/signup",
                                     "/api/v1/auth/login",
+                                    "/api/v1/auth/logout",
                                     "/api/v1/auth/refresh",
                                     "/api/v1/storage/presigned-url"
                             ).permitAll();

@@ -6,7 +6,7 @@ import com.project.review.common.exception.BusinessException;
 import com.project.review.common.exception.ErrorCode;
 import com.project.review.member.entities.Member;
 import com.project.review.member.service.MemberService;
-import com.project.review.member.service.TokenService;
+import com.project.review.auth.service.TokenService;
 import com.project.review.review.dtos.ReviewPageResponse;
 import com.project.review.review.dtos.ReviewRequest;
 import com.project.review.review.dtos.ReviewResponse;

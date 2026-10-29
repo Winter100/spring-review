@@ -2,6 +2,7 @@ package com.project.review.auth.service;
 
 import com.project.review.auth.dtos.LoginRequest;
 import com.project.review.auth.dtos.LoginResult;
+import com.project.review.auth.dtos.RefreshResult;
 import com.project.review.auth.dtos.SignupRequest;
 import com.project.review.auth.entities.RefreshToken;
 import com.project.review.auth.repository.RefreshTokenRepository;
@@ -41,21 +42,36 @@ public class AuthService {
                         loginRequest.password()
                 )
         );
-
         Member member = memberService.findByEmail(authentication.getName());
         String accessToken = tokenService.createAccessToken(member);
         String refreshToken = tokenService.createRefreshToken(member);
-        Instant now = Instant.now();
-        Duration refreshTokenExpiresDays = Duration.ofDays(tokenProperties.refreshTokenExpiresDays());
+        String tokenHash = tokenService.hashRefreshToken(refreshToken);
 
-        refreshTokenRepository.save(
-                new RefreshToken(
-                        member,
-                        tokenService.hashRefreshToken(refreshToken),
-                        now.plus(refreshTokenExpiresDays)
-                ));
+        Duration lifetime =
+                Duration.ofDays(tokenProperties.refreshTokenExpiresDays());
+        Instant expiresAt = Instant.now().plus(lifetime);
 
-        return new LoginResult(accessToken, refreshToken, refreshTokenExpiresDays, member);
+        RefreshToken storedToken = refreshTokenRepository
+                .findByMemberId(member.getId())
+                .orElse(null);
+
+        if (storedToken == null) {
+            refreshTokenRepository.save(
+                    new RefreshToken(member, tokenHash, expiresAt)
+            );
+        } else {
+            storedToken.renew(tokenHash, expiresAt);
+        }
+
+        return new LoginResult(accessToken, refreshToken, lifetime, member);
+    }
+
+    @Transactional
+    public void logout(String refreshToken) {
+        isBlankTokenOrElseThrow(refreshToken);
+
+        String tokenHash = tokenService.hashRefreshToken(refreshToken);
+        refreshTokenRepository.deleteByTokenHash(tokenHash);
     }
 
     @Transactional
@@ -65,31 +81,47 @@ public class AuthService {
 
     // 만료 토큰을 삭제한 뒤 예외를 던져도 해당 삭제는 커밋합니다.
     @Transactional(noRollbackFor = RefreshTokenException.class)
-    public String refreshAccessToken(String refreshToken){
+    public RefreshResult refreshAccessToken(String refreshToken) {
+
         isBlankTokenOrElseThrow(refreshToken);
         Jwt jwt = tokenService.decodeRefreshToken(refreshToken);
+
         Instant now = Instant.now();
+
         if (jwt.getExpiresAt() == null
                 || (jwt.getNotBefore() != null && jwt.getNotBefore().isAfter(now))) {
-            throw new RefreshTokenException(ErrorCode.REFRESH_UN_VALID);
+            throw new RefreshTokenException(ErrorCode.REFRESH_INVALID);
         }
 
         // 서버가 발급하고 DB에 등록한 원문과 일치하는 토큰만 허용합니다.
         RefreshToken storedToken = refreshTokenRepository
                 .findByTokenHash(tokenService.hashRefreshToken(refreshToken))
-                .orElseThrow(() -> new RefreshTokenException(ErrorCode.REFRESH_UN_VALID));
+                .orElseThrow(() -> new RefreshTokenException(ErrorCode.REFRESH_INVALID));
 
         if (!jwt.getExpiresAt().isAfter(now) || !storedToken.getExpiresAt().isAfter(now)) {
             refreshTokenRepository.delete(storedToken);
-            throw new RefreshTokenException(ErrorCode.REFRESH_EXPIRES);
+            throw new RefreshTokenException(ErrorCode.REFRESH_INVALID);
         }
 
-        return tokenService.createAccessToken(storedToken.getMember());
+        Member member = storedToken.getMember();
+
+        Instant expiresAt = jwt.getExpiresAt().isBefore(storedToken.getExpiresAt())
+                ? jwt.getExpiresAt()
+                : storedToken.getExpiresAt();
+
+        String newRefreshToken = tokenService.createRefreshToken(member, expiresAt);
+        String accessToken = tokenService.createAccessToken(member);
+
+        storedToken.rotationToken(
+                tokenService.hashRefreshToken(newRefreshToken)
+        );
+
+        return new RefreshResult(accessToken, newRefreshToken, expiresAt);
     }
 
-    private void isBlankTokenOrElseThrow(String token){
+    private void isBlankTokenOrElseThrow(String token) {
         if (token == null || token.isBlank()) {
-            throw new RefreshTokenException(ErrorCode.REFRESH_NOT_FOUND);
+            throw new RefreshTokenException(ErrorCode.REFRESH_INVALID);
         }
     }
 

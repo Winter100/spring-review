@@ -90,7 +90,7 @@ class RefreshTokenTests {
                         .cookie(new Cookie("refreshToken", refreshToken)))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
+                .andExpect(cookie().path("refreshToken", "/api/v1/auth"))
                 .andExpect(jsonPath("$.accessToken").isString())
                 .andExpect(jsonPath("$.refreshToken").doesNotExist())
                 .andReturn().getResponse().getContentAsString();
@@ -113,7 +113,7 @@ class RefreshTokenTests {
     @Test
     void expiredTokenReturns401AndCommitsDeletion() throws Exception {
         String refreshToken = saveToken(Instant.now().minusSeconds(1));
-        expectRejected(refreshToken, "리프레시 토큰이 만료되었습니다. 다시 로그인해 주세요.");
+        expectRejected(refreshToken, "로그인이 만료되었거나 유효하지 않습니다. 다시 로그인해 주세요.");
         assertThat(tokens.count()).isZero();
     }
 
@@ -121,33 +121,33 @@ class RefreshTokenTests {
     void missingCookieReturns401AndClearsCookie() throws Exception {
         mvc.perform(post("/api/v1/auth/refresh"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.message").value("리프레시 토큰이 없습니다. 다시 로그인해 주세요."))
+                .andExpect(jsonPath("$.message").value("로그인이 만료되었거나 유효하지 않습니다. 다시 로그인해 주세요."))
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Max-Age=0")));
     }
 
     @Test
     void blankCookieReturns401() throws Exception {
-        expectRejected("", "리프레시 토큰이 없습니다. 다시 로그인해 주세요.");
+        expectRejected("", "로그인이 만료되었거나 유효하지 않습니다. 다시 로그인해 주세요.");
     }
 
     @Test
     void unregisteredSignedRefreshTokenReturns401() throws Exception {
         expectRejected(tokenService.createRefreshToken(member),
-                "유효하지 않은 리프레시 토큰입니다. 다시 로그인해 주세요.");
+                "로그인이 만료되었거나 유효하지 않습니다. 다시 로그인해 주세요.");
     }
 
     @Test
     void tamperedTokenReturns401WithoutDeletingValidToken() throws Exception {
         String refreshToken = saveToken(Instant.now().plusSeconds(3600));
         expectRejected(refreshToken + "tampered",
-                "유효하지 않은 리프레시 토큰입니다. 다시 로그인해 주세요.");
+                "로그인이 만료되었거나 유효하지 않습니다. 다시 로그인해 주세요.");
         assertThat(tokens.count()).isEqualTo(1);
     }
 
     @Test
     void accessTokenCannotBeUsedAsRefreshToken() throws Exception {
         expectRejected(tokenService.createAccessToken(member),
-                "유효하지 않은 리프레시 토큰입니다. 다시 로그인해 주세요.");
+                "로그인이 만료되었거나 유효하지 않습니다. 다시 로그인해 주세요.");
     }
 
     @Test
@@ -176,7 +176,7 @@ class RefreshTokenTests {
             String token = signedToken(type, Instant.now().plusSeconds(3600));
             RefreshToken stored = tokens.save(new RefreshToken(
                     member, tokenService.hashRefreshToken(token), Instant.now().plusSeconds(3600)));
-            expectRejected(token, "유효하지 않은 리프레시 토큰입니다. 다시 로그인해 주세요.");
+            expectRejected(token, "로그인이 만료되었거나 유효하지 않습니다. 다시 로그인해 주세요.");
             assertThat(tokens.existsById(stored.getId())).isTrue();
             tokens.delete(stored);
         }
@@ -188,7 +188,7 @@ class RefreshTokenTests {
         tokens.save(new RefreshToken(
                 member, tokenService.hashRefreshToken(token), Instant.now().plusSeconds(3600)));
 
-        expectRejected(token, "리프레시 토큰이 만료되었습니다. 다시 로그인해 주세요.");
+        expectRejected(token, "로그인이 만료되었거나 유효하지 않습니다. 다시 로그인해 주세요.");
 
         assertThat(tokens.count()).isZero();
     }
@@ -199,7 +199,7 @@ class RefreshTokenTests {
         tokens.save(new RefreshToken(
                 member, tokenService.hashRefreshToken(token), Instant.now().plusSeconds(3600)));
 
-        expectRejected(token, "유효하지 않은 리프레시 토큰입니다. 다시 로그인해 주세요.");
+        expectRejected(token, "로그인이 만료되었거나 유효하지 않습니다. 다시 로그인해 주세요.");
 
         assertThat(tokens.count()).isEqualTo(1);
     }
@@ -225,7 +225,7 @@ class RefreshTokenTests {
             String token = encodeToken(claims);
             RefreshToken stored = tokens.save(new RefreshToken(
                     member, tokenService.hashRefreshToken(token), now.plusSeconds(3600)));
-            expectRejected(token, "유효하지 않은 리프레시 토큰입니다. 다시 로그인해 주세요.");
+            expectRejected(token, "로그인이 만료되었거나 유효하지 않습니다. 다시 로그인해 주세요.");
             assertThat(tokens.existsById(stored.getId())).isTrue();
             tokens.delete(stored);
         }
@@ -241,7 +241,7 @@ class RefreshTokenTests {
         tokens.save(new RefreshToken(
                 member, tokenService.hashRefreshToken(tamperedToken), Instant.now().plusSeconds(3600)));
 
-        expectRejected(tamperedToken, "유효하지 않은 리프레시 토큰입니다. 다시 로그인해 주세요.");
+        expectRejected(tamperedToken, "로그인이 만료되었거나 유효하지 않습니다. 다시 로그인해 주세요.");
 
         assertThat(tokens.count()).isEqualTo(1);
     }
@@ -272,22 +272,22 @@ class RefreshTokenTests {
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Secure")))
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("HttpOnly")))
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("SameSite=Lax")))
-                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Path=/api/v1")));
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Path=/api/v1/auth")));
     }
 
     @Test
     void loginCookieCanBeUsedForRefresh() throws Exception {
-        var login = mvc.perform(post("/api/v1/member/login")
+        var login = mvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"email":"refresh@example.com","password":"password123"}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
-                .andExpect(jsonPath("$.member.id").value(member.getId()))
-                .andExpect(jsonPath("$.member.email").value(member.getEmail()))
-                .andExpect(jsonPath("$.member.password").doesNotExist())
-                .andExpect(jsonPath("$.access_token").isString())
+                .andExpect(jsonPath("$.user.id").value(member.getId()))
+                .andExpect(jsonPath("$.user.email").value(member.getEmail()))
+                .andExpect(jsonPath("$.user.password").doesNotExist())
+                .andExpect(jsonPath("$.accessToken").isString())
                 .andExpect(jsonPath("$.refreshToken").doesNotExist())
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("HttpOnly")))
                 .andReturn().getResponse();
@@ -302,7 +302,7 @@ class RefreshTokenTests {
 
     @Test
     void signupHashesPasswordAndAssignsUserRole() throws Exception {
-        mvc.perform(post("/api/v1/member")
+        mvc.perform(post("/api/v1/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"email":"new@example.com","password":"password123","nickname":"new-user"}
@@ -321,14 +321,14 @@ class RefreshTokenTests {
 
     @Test
     void duplicateEmailAndNicknameAreRejected() throws Exception {
-        mvc.perform(post("/api/v1/member")
+        mvc.perform(post("/api/v1/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"email":"refresh@example.com","password":"password123","nickname":"new-user"}
                                 """))
                 .andExpect(status().isConflict());
 
-        mvc.perform(post("/api/v1/member")
+        mvc.perform(post("/api/v1/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"email":"new@example.com","password":"password123","nickname":"refresh-user"}
@@ -340,7 +340,7 @@ class RefreshTokenTests {
 
     @Test
     void wrongPasswordDoesNotIssueTokens() throws Exception {
-        mvc.perform(post("/api/v1/member/login")
+        mvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"email":"refresh@example.com","password":"wrong-password"}
@@ -352,9 +352,44 @@ class RefreshTokenTests {
     }
 
     @Test
-    void repeatedLoginsStoreDistinctHashesInsteadOfRawTokens() throws Exception {
+    void refreshRotatesCookieAndRejectsPreviousToken() throws Exception {
+        String originalToken = saveToken(Instant.now().plusSeconds(3600));
+        Instant originalExpiry = tokens.findAll().getFirst().getExpiresAt();
+
+        Cookie replacement = mvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(new Cookie("refreshToken", originalToken)))
+                .andExpect(status().isOk())
+                .andExpect(cookie().path("refreshToken", "/api/v1/auth"))
+                .andReturn().getResponse().getCookie("refreshToken");
+
+        assertThat(replacement).isNotNull();
+        assertThat(replacement.getValue()).isNotEqualTo(originalToken);
+        assertThat(replacement.getMaxAge()).isBetween(1, 3600);
+        assertThat(tokens.findByTokenHash(tokenService.hashRefreshToken(originalToken))).isEmpty();
+        assertThat(tokens.findByTokenHash(tokenService.hashRefreshToken(replacement.getValue())))
+                .hasValueSatisfying(token -> assertThat(token.getExpiresAt()).isEqualTo(originalExpiry));
+
+        mvc.perform(post("/api/v1/auth/refresh").cookie(replacement))
+                .andExpect(status().isOk());
+        expectRejected(originalToken, "로그인이 만료되었거나 유효하지 않습니다. 다시 로그인해 주세요.");
+    }
+
+    @Test
+    void logoutDeletesStoredTokenWithoutAccessToken() throws Exception {
+        String refreshToken = saveToken(Instant.now().plusSeconds(3600));
+
+        mvc.perform(post("/api/v1/auth/logout").cookie(new Cookie("refreshToken", refreshToken)))
+                .andExpect(status().isOk())
+                .andExpect(cookie().path("refreshToken", "/api/v1/auth"))
+                .andExpect(cookie().maxAge("refreshToken", 0));
+
+        assertThat(tokens.count()).isZero();
+    }
+
+    @Test
+    void repeatedLoginsReplaceHashInSingleRow() throws Exception {
         for (int attempt = 0; attempt < 2; attempt++) {
-            Cookie cookie = mvc.perform(post("/api/v1/member/login")
+            Cookie cookie = mvc.perform(post("/api/v1/auth/login")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
                                     {"email":"refresh@example.com","password":"password123"}
@@ -367,7 +402,7 @@ class RefreshTokenTests {
                     .isPresent();
             assertThat(tokens.findByTokenHash(cookie.getValue())).isEmpty();
         }
-        assertThat(tokens.count()).isEqualTo(2);
+        assertThat(tokens.count()).isEqualTo(1);
     }
 
     private String saveToken(Instant expiresAt) {

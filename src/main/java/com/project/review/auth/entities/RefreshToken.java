@@ -17,6 +17,9 @@ public class RefreshToken {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    private Long version;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "member_id", nullable = false, unique = true)
     private Member member;
@@ -31,5 +34,14 @@ public class RefreshToken {
         this.member = member;
         this.tokenHash = tokenHash;
         this.expiresAt = expiresAt;
+    }
+
+    public void renew(String tokenHash, Instant expiresAt) {
+        this.tokenHash = tokenHash;
+        this.expiresAt = expiresAt;
+    }
+
+    public void rotationToken(String tokenHash) {
+        this.tokenHash = tokenHash;
     }
 }

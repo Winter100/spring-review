@@ -1,6 +1,11 @@
 package com.project.review.common.exception;
 
+import com.project.review.auth.entities.RefreshToken;
 import com.project.review.common.dtos.CustomErrorResponse;
+import jakarta.persistence.OptimisticLockException;
+import org.hibernate.StaleObjectStateException;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import com.project.review.member.exception.DuplicateMemberException;
 import com.project.review.member.exception.MemberNotFoundException;
 import com.project.review.member.exception.RefreshTokenException;
@@ -25,7 +30,7 @@ import java.util.Locale;
 
 @Slf4j
 @RestControllerAdvice
-public class GlobaclExceptionHandler {
+public class GlobalExceptionHandler {
 
     private record FieldErrorResponse(
             String field,
@@ -64,6 +69,35 @@ public class GlobaclExceptionHandler {
         return error(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
+    @ExceptionHandler({OptimisticLockingFailureException.class, OptimisticLockException.class})
+    public ResponseEntity<CustomErrorResponse> handleOptimisticLock(Exception ex) {
+        if (isRefreshTokenConflict(ex)) {
+            return ResponseEntity.status(ErrorCode.AUTH_TOKEN_CONFLICT.getStatus())
+                    .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                    .body(new CustomErrorResponse(ErrorCode.AUTH_TOKEN_CONFLICT.getMessage()));
+        }
+        return error(ErrorCode.REVIEW_UPDATE_CONFLICT.getStatus(),
+                ErrorCode.REVIEW_UPDATE_CONFLICT.getMessage());
+    }
+
+    private boolean isRefreshTokenConflict(Throwable exception) {
+        for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+            if (cause instanceof ObjectOptimisticLockingFailureException conflict
+                    && RefreshToken.class.getName().equals(conflict.getPersistentClassName())) {
+                return true;
+            }
+            if (cause instanceof OptimisticLockException conflict
+                    && conflict.getEntity() instanceof RefreshToken) {
+                return true;
+            }
+            if (cause instanceof StaleObjectStateException conflict
+                    && RefreshToken.class.getName().equals(conflict.getEntityName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<CustomErrorResponse> handleBadCredentials(
             BadCredentialsException ex
@@ -81,7 +115,7 @@ public class GlobaclExceptionHandler {
                 .httpOnly(true)
                 .secure(request.isSecure())
                 .sameSite("Lax")
-                .path("/api/v1")
+                .path("/api/v1/auth")
                 .maxAge(0)
                 .build();
 
