@@ -1,4 +1,4 @@
-package com.project.review.member.dtos;
+package com.project.review.auth.dtos;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

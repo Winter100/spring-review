@@ -1,6 +1,6 @@
 package com.project.review.storage.controller;
 
-import com.project.review.member.service.TokenService;
+import com.project.review.auth.service.TokenService;
 import com.project.review.storage.dtos.ImageUploadBatchRequest;
 import com.project.review.storage.dtos.ImageUploadResponse;
 import com.project.review.storage.service.StorageService;

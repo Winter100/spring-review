@@ -1,26 +1,15 @@
 package com.project.review.member.controller;
 
-import com.project.review.common.config.TokenProperties;
-import com.project.review.member.dtos.LoginRequest;
-import com.project.review.member.dtos.LoginResponse;
-import com.project.review.member.dtos.MemberRequest;
+import com.project.review.auth.service.TokenService;
 import com.project.review.member.dtos.MemberResponse;
-import com.project.review.member.dtos.TokenResponse;
 import com.project.review.member.service.MemberService;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.CookieValue;
-import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.time.Duration;
 
 @RestController
 @RequestMapping("/api/v1/member")
@@ -28,43 +17,15 @@ import java.time.Duration;
 public class MemberController {
 
     private final MemberService memberService;
-    private final TokenProperties tokenProperties;
+    private final TokenService tokenService;
 
-    @PostMapping
-    public ResponseEntity<MemberResponse> create(
-            @Valid @RequestBody MemberRequest memberRequest
-    ) {
-        MemberResponse memberResponse = memberService.create(memberRequest);
-        return ResponseEntity.status(HttpStatus.CREATED).body(memberResponse);
+    @GetMapping
+    public ResponseEntity<MemberResponse> me(
+            @AuthenticationPrincipal Jwt jwt
+    ){
+        Long memberId = tokenService.extractMemberId(jwt);
+
+        return ResponseEntity.ok().body(MemberResponse.from(memberService.findById(memberId)));
     }
 
-    @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(
-            @Valid @RequestBody LoginRequest loginRequest,
-            HttpServletRequest request
-    ) {
-        MemberService.LoginResult loginResult = memberService.login(loginRequest);
-        ResponseCookie refreshTokenCookie = ResponseCookie.from("refreshToken", loginResult.refreshToken())
-                .httpOnly(true)
-                .secure(request.isSecure())
-                .sameSite("Lax")
-                .path("/api/v1")
-                .maxAge(Duration.ofDays(tokenProperties.refreshTokenExpiresDays()))
-                .build();
-
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString())
-                .header(HttpHeaders.CACHE_CONTROL, "no-store")
-                .body(LoginResponse.from(loginResult.member(), loginResult.accessToken()));
-    }
-
-    /** access token이 없어도 refresh 쿠키로 재발급을 요청할 수 있습니다. */
-    @PostMapping("/refresh")
-    public ResponseEntity<TokenResponse> refresh(
-            @CookieValue(name = "refreshToken", required = false) String refreshToken
-    ) {
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CACHE_CONTROL, "no-store")
-                .body(new TokenResponse(memberService.refreshAccessToken(refreshToken)));
-    }
 }

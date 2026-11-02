@@ -1,7 +1,7 @@
 package com.project.review.storage;
 
-import com.project.review.common.exception.GlobaclExceptionHandler;
-import com.project.review.member.service.TokenService;
+import com.project.review.common.exception.GlobalExceptionHandler;
+import com.project.review.auth.service.TokenService;
 import com.project.review.storage.controller.StorageController;
 import com.project.review.storage.dtos.ImageUploadRequest;
 import com.project.review.storage.dtos.ImageUploadResponse;
@@ -35,7 +35,7 @@ class StorageUploadValidationTests {
         when(tokenService.extractMemberId(null)).thenReturn(1L);
         mvc = MockMvcBuilders.standaloneSetup(new StorageController(storageService, tokenService))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
-                .setControllerAdvice(new GlobaclExceptionHandler())
+                .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
 

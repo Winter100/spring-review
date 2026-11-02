@@ -21,6 +21,9 @@ spring:
         max-page-size: 100
 
   jpa:
+    properties:
+      # 요청 DTO와 동일한 Jackson 3 JsonNode로 JSON 컬럼을 변환합니다.
+      hibernate.type.json_format_mapper: jackson3
     hibernate:
       ddl-auto: update
 

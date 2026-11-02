@@ -1,5 +1,7 @@
 package com.project.review.member.entities;
 
+import com.project.review.auth.entities.RefreshToken;
+import com.project.review.auth.entities.Role;
 import com.project.review.review.entities.Review;
 import com.project.review.storage.entities.ImageUploadStatus;
 import jakarta.persistence.Column;

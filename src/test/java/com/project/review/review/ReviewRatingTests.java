@@ -32,6 +32,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.function.Consumer;
 
+import static com.project.review.review.ReviewContentFixtures.textDocument;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -106,7 +107,7 @@ class ReviewRatingTests {
                 .satisfies(review -> assertThat(review.getRating()).isEqualByComparingTo(rating));
         mvc.perform(get("/api/v1/reviews"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].rating").value(new BigDecimal(rating).doubleValue()));
+                .andExpect(jsonPath("$.content[0].rating").value(new BigDecimal(rating).doubleValue()));
     }
 
     @ParameterizedTest
@@ -116,14 +117,14 @@ class ReviewRatingTests {
                         .with(jwt().jwt(token -> token.subject(memberId.toString())))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new ReviewRequest(
-                                "이미지 검증", "선택 이미지도 빈 키는 허용하지 않습니다.", BigDecimal.ONE,
-                                categoryId, key, List.of()))))
+                                "이미지 검증", "Product", textDocument("선택 이미지도 빈 키는 허용하지 않습니다."), BigDecimal.ONE,
+                                categoryId, key, List.of(), null, null, null, null))))
                 .andExpect(status().isBadRequest());
         assertThat(reviews.count()).isZero();
     }
 
     @Test
-    void returnsPublicImageUrlsWithEstablishedFieldNames() throws Exception {
+    void returnsImageKeysWithEstablishedFieldNames() throws Exception {
         Member member = members.findById(memberId).orElseThrow();
         for (String key : List.of("reviews/main.png", "reviews/sub.png")) {
             uploads.save(new ImageUploadStatus(member, key, "image/png", 100L, UploadStatus.PENDING,
@@ -135,12 +136,11 @@ class ReviewRatingTests {
                         .with(jwt().jwt(token -> token.subject(memberId.toString())))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new ReviewRequest(
-                                "이미지 응답", "공개 URL 필드와 저장 키를 구분합니다.", BigDecimal.ONE,
-                                categoryId, "reviews/main.png", List.of("reviews/sub.png")))))
+                                "이미지 응답", "Product", textDocument("공개 URL 필드와 저장 키를 구분합니다."), BigDecimal.ONE,
+                                categoryId, "reviews/main.png", List.of("reviews/sub.png"), null, null, null, null))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.mainImageUrl").value("https://images.example.com/reviews/main.png"))
-                .andExpect(jsonPath("$.subImageUrls[0]").value("https://images.example.com/reviews/sub.png"))
-                .andExpect(jsonPath("$.mainImageKey").doesNotExist());
+                .andExpect(jsonPath("$.mainImageKey").value("reviews/main.png"))
+                .andExpect(jsonPath("$.subImageKeys[0]").value("reviews/sub.png"));
     }
 
     @Test
@@ -182,7 +182,7 @@ class ReviewRatingTests {
 
     private Long saveReview() {
         Review review = Review.builder()
-                .title("삭제 테스트").content("작성자 권한을 확인합니다.").rating(BigDecimal.ONE)
+                .title("삭제 테스트").product("Product").content(textDocument("작성자 권한을 확인합니다.")).rating(BigDecimal.ONE)
                 .author(members.findById(memberId).orElseThrow())
                 .category(categories.findById(categoryId).orElseThrow()).build();
         review.addImage("reviews/main.png", 0);
@@ -203,7 +203,7 @@ class ReviewRatingTests {
 
     private String requestBody(String rating) {
         return """
-                {"title":"평점 테스트","content":"소수 평점 저장 확인","rating":%s,"categoryId":%d}
+                {"title":"평점 테스트","product":"Product","content":{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"소수 평점 저장 확인"}]}]},"rating":%s,"categoryId":%d}
                 """.formatted(rating, categoryId);
     }
 }

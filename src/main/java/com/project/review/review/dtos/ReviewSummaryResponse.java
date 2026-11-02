@@ -13,7 +13,8 @@ public record ReviewSummaryResponse(
         BigDecimal rating,
         MemberSummaryResponse author,
         CategoryResponse category,
-        String mainImageKey
+        String mainImageKey,
+        long viewCount
 ) {
 
     // JPQL에서 선택한 필드만 받아 기존 작성자·카테고리 응답 구조를 유지합니다.
@@ -35,7 +36,12 @@ public record ReviewSummaryResponse(
                 rating,
                 new MemberSummaryResponse(authorId, nickname),
                 new CategoryResponse(categoryId, categoryName),
-                mainImageKey
+                mainImageKey,
+                0L
         );
+    }
+
+    public ReviewSummaryResponse withViewCount(long count) {
+        return new ReviewSummaryResponse(id, title, createdAt, rating, author, category, mainImageKey, count);
     }
 }

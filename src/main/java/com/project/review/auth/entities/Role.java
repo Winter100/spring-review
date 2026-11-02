@@ -1,4 +1,4 @@
-package com.project.review.member.entities;
+package com.project.review.auth.entities;
 
 public enum Role {
     USER,

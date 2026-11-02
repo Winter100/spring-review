@@ -9,8 +9,18 @@ import com.project.review.storage.entities.UploadStatus;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 public interface ImageUploadRepository extends JpaRepository<ImageUploadStatus, Long> {
+
+    @Modifying
+    @Query("""
+            update ImageUploadStatus upload set upload.status = :expired
+            where upload.imageKey in :keys and upload.status = :pending
+            """)
+    int expirePendingForDeletion(@Param("keys") Set<String> keys,
+                                @Param("pending") UploadStatus pending,
+                                @Param("expired") UploadStatus expired);
 
     List<ImageUploadStatus> findAllByImageKeyIn(List<String> imageKeys);
 

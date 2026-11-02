@@ -3,6 +3,7 @@ package com.project.review.common.config;
 import com.project.review.common.exception.SecurityErrorHandler;
 import jakarta.servlet.DispatcherType;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.h2console.autoconfigure.H2ConsoleProperties;
 import org.springframework.boot.security.autoconfigure.web.servlet.PathRequest;
 import org.springframework.context.annotation.Bean;
@@ -11,6 +12,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -19,6 +21,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 
@@ -48,13 +53,15 @@ public class SecurityConfig {
             SecurityErrorHandler securityErrorHandler,
             ObjectProvider<H2ConsoleProperties> h2ConsoleProperties
     ) throws Exception {
-        http.csrf((csrf) -> csrf.disable())
+        http.cors(Customizer.withDefaults())
+                .csrf((csrf) -> csrf.disable())
                 .headers(headers -> headers
                         .frameOptions(frame -> frame.sameOrigin()) // H2 콘솔 iframe 허용
                 )
                 .authorizeHttpRequests(auth -> {
                     // 서버 내부 오류 응답은 원래 상태 코드로 전달합니다.
                     auth.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                            .requestMatchers(HttpMethod.GET, "/api/v1/reviews/*/edit").authenticated()
                             .requestMatchers(
                                     HttpMethod.GET,
                                     "/api/v1/categories",
@@ -66,10 +73,10 @@ public class SecurityConfig {
                             ).permitAll()
                             .requestMatchers(
                                     HttpMethod.POST,
-                                    "/api/v1/member",
-                                    "/api/v1/member/login",
-                                    "/api/v1/member/refresh",
-                                    "/api/v1/storage/presigned-url"
+                                    "/api/v1/auth/signup",
+                                    "/api/v1/auth/login",
+                                    "/api/v1/auth/logout",
+                                    "/api/v1/auth/refresh"
                             ).permitAll();
 
                     // 콘솔이 비활성화되면 설정 빈도 없으므로 매처를 등록하지 않습니다.
@@ -90,6 +97,20 @@ public class SecurityConfig {
                 );
 
         return http.build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource(
+            @Value("${security.app.frontend-origin}") String frontendOrigin
+    ) {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(List.of(frontendOrigin));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        configuration.setAllowCredentials(true);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/v1/**", configuration);
+        return source;
     }
 
     @Bean
