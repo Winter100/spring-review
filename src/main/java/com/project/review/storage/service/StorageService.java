@@ -9,6 +9,7 @@ import com.project.review.storage.dtos.ImageUploadBatchRequest;
 import com.project.review.storage.dtos.ImageUploadRequest;
 import com.project.review.storage.dtos.ImageUploadResponse;
 import com.project.review.storage.dtos.UploadVerification;
+import com.project.review.storage.dtos.ImageDeletionResult;
 import com.project.review.storage.entities.ImageUploadStatus;
 import com.project.review.storage.entities.UploadStatus;
 import com.project.review.storage.repository.ImageUploadRepository;
@@ -20,6 +21,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.DeleteObjectsResponse;
+import software.amazon.awssdk.services.s3.model.ObjectIdentifier;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
@@ -206,5 +209,48 @@ public class StorageService {
                 .build()
                 .encode()
                 .toUriString();
+    }
+
+    /** 과거 본문 전용 이미지의 PENDING 상태를 닫아 참조 검사 이후 새 연결을 막습니다. */
+    public void preventPendingAttachment(Set<String> imageKeys) {
+        if (imageKeys.isEmpty()) return;
+        transactionTemplate.executeWithoutResult(status -> imageUploadRepository.expirePendingForDeletion(
+                imageKeys, UploadStatus.PENDING, UploadStatus.EXPIRED));
+    }
+
+    public ImageDeletionResult deleteObjects(List<String> imageKeys) {
+        if (imageKeys.isEmpty()) {
+            return new ImageDeletionResult(Set.of(), Map.of());
+        }
+
+        if (imageKeys.size() > 1000) {
+            throw new IllegalArgumentException("한 번에 최대 1,000개까지 삭제할 수 있습니다.");
+        }
+
+        List<ObjectIdentifier> objects = imageKeys.stream()
+                .distinct()
+                .map(key -> ObjectIdentifier.builder()
+                        .key(key)
+                        .build())
+                .toList();
+
+        DeleteObjectsResponse response = s3Client.deleteObjects(request -> request
+                .bucket(bucket)
+                .delete(delete -> delete
+                        .objects(objects)
+                        .quiet(true)));
+
+        Set<String> succeeded = new HashSet<>(imageKeys);
+        Map<String, String> failed = new HashMap<>();
+        for (var error : response.errors()) {
+            if (!succeeded.contains(error.key())) {
+                throw new IllegalStateException("삭제 응답에 요청하지 않은 이미지 키가 있습니다.");
+            }
+            if (!"NoSuchKey".equals(error.code())) {
+                failed.put(error.key(), error.code() + ": " + error.message());
+            }
+        }
+        succeeded.removeAll(failed.keySet());
+        return new ImageDeletionResult(succeeded, failed);
     }
 }

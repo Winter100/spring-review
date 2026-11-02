@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -74,6 +75,15 @@ public class ReviewController {
         return response.body(review);
     }
 
+    @GetMapping("/{id}/edit")
+    public ResponseEntity<ReviewResponse> findByIdEditView(
+            @PathVariable("id") Long id,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(reviewService.findByIdEditView(id, jwt));
+    }
+
     @Operation(
             summary = "리뷰 생성",
             description = "인증된 회원의 리뷰를 저장합니다. 대표 이미지 1개와 서브 이미지 최대 4개는 선택 사항입니다."
@@ -104,7 +114,7 @@ public class ReviewController {
         return ResponseEntity.noContent().build();
     }
 
-    @Operation(summary = "리뷰 삭제", description = "작성자 본인의 리뷰와 연결된 이미지 DB 행을 삭제합니다. 스토리지 객체 삭제는 아직 구현되지 않았습니다.")
+    @Operation(summary = "리뷰 삭제", description = "작성자 본인의 리뷰와 연결된 이미지 DB 행을 삭제합니다. 스토리지 객체는 다음 한국 자정에 삭제합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "삭제 성공"),

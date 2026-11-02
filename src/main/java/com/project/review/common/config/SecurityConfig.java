@@ -61,6 +61,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> {
                     // 서버 내부 오류 응답은 원래 상태 코드로 전달합니다.
                     auth.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                            .requestMatchers(HttpMethod.GET, "/api/v1/reviews/*/edit").authenticated()
                             .requestMatchers(
                                     HttpMethod.GET,
                                     "/api/v1/categories",
@@ -75,8 +76,7 @@ public class SecurityConfig {
                                     "/api/v1/auth/signup",
                                     "/api/v1/auth/login",
                                     "/api/v1/auth/logout",
-                                    "/api/v1/auth/refresh",
-                                    "/api/v1/storage/presigned-url"
+                                    "/api/v1/auth/refresh"
                             ).permitAll();
 
                     // 콘솔이 비활성화되면 설정 빈도 없으므로 매처를 등록하지 않습니다.

@@ -16,7 +16,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
-import java.time.Duration;
+import com.project.review.review.service.ImageDeletionTime;
 import java.time.Instant;
 
 /**
@@ -74,8 +74,12 @@ public class ReviewImageDelete {
 
     // 스토리지 삭제 성공을 확인한 뒤 호출합니다.
     public void markDeleted() {
+        markDeleted(Instant.now());
+    }
+
+    public void markDeleted(Instant deletedAt) {
         this.status = ImageDeleteStatus.DELETED;
-        this.deletedAt = Instant.now();
+        this.deletedAt = deletedAt;
     }
 
     // 실패 시 PENDING 상태를 유지하고 다음 시도 시각을 기록합니다.
@@ -87,7 +91,11 @@ public class ReviewImageDelete {
         this.nextAttemptAt = nextAttemptAt;
     }
 
+    public void deferUntil(Instant nextAttemptAt) {
+        this.nextAttemptAt = nextAttemptAt;
+    }
+
     private static Instant defaultNextAttemptAt(){
-        return Instant.now().plus(Duration.ofHours(24));
+        return ImageDeletionTime.nextMidnight(Instant.now());
     }
 }

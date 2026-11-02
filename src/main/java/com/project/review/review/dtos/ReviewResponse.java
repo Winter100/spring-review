@@ -4,6 +4,7 @@ import com.project.review.category.dtos.CategoryResponse;
 import com.project.review.member.dtos.MemberSummaryResponse;
 import com.project.review.review.entities.Review;
 import io.swagger.v3.oas.annotations.media.Schema;
+import tools.jackson.databind.JsonNode;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -14,9 +15,14 @@ public record ReviewResponse(
         Long id,
         String title,
         CategoryResponse category,
-        String content,
+        String product,
+        JsonNode content,
         BigDecimal rating,
         Instant createdAt,
+        String duration,
+        List<String> pros,
+        List<String> cons,
+        String verdict,
         String mainImageKey,
         List<String> subImageKeys,
         MemberSummaryResponse author,
@@ -29,9 +35,14 @@ public record ReviewResponse(
                 review.getId(),
                 review.getTitle(),
                 CategoryResponse.from(review.getCategory()),
+                review.getProduct(),
                 review.getContent(),
                 review.getRating(),
                 review.getCreatedAt(),
+                review.getDuration(),
+                review.getPros(),
+                review.getCons(),
+                review.getVerdict(),
                 mainImageKey,
                 subImageKeys,
                 MemberSummaryResponse.from(review.getAuthor()),

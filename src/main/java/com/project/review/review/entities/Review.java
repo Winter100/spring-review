@@ -12,7 +12,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
+import tools.jackson.databind.JsonNode;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -38,9 +41,28 @@ public class Review {
     @Size(min = 1, max = 30)
     private String title;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
-    @Size(min = 1, max = 5000)
-    private String content;
+    @Column(nullable = false)
+    private String product;
+
+    @Column()
+    // 구매 또는 사용 횟수
+    private String duration;
+
+    @Column
+    // 이런점이 좋았어요
+    private List<String> pros;
+
+    @Column
+    // 이런점은 아쉬웠어요
+    private List<String> cons;
+
+    @Column
+    // 이런분께 추천해요
+    private String verdict;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(nullable = false)
+    private JsonNode content;
 
     @DecimalMin("0")
     @DecimalMax("5")
@@ -72,24 +94,45 @@ public class Review {
         images.add(new ReviewImage(this, imageKey, displayOrder));
     }
 
-    public void clearImages(){
+    public void clearImages() {
         images.clear();
     }
 
     @Builder
-    public Review(String title, String content, BigDecimal rating, Member author, Category category) {
+    public Review(String title,
+                  JsonNode content,
+                  BigDecimal rating,
+                  Member author,
+                  Category category,
+                  String duration,
+                  List<String> pros,
+                  List<String> cons,
+                  String verdict,
+                  String product
+    ) {
         this.title = title;
         this.content = content;
         this.rating = rating;
         this.author = author;
         this.category = category;
+        this.duration = duration;
+        this.pros = pros;
+        this.cons = cons;
+        this.verdict = verdict;
+        this.product = product;
     }
 
-    public void updateDetails(String title, String content, BigDecimal rating, Category category){
+    public void updateDetails(String title, JsonNode content, BigDecimal rating, String product, Category category,
+                              String duration, List<String> pros, List<String> cons, String verdict) {
         this.title = title;
         this.content = content;
         this.rating = rating;
+        this.product = product;
         this.category = category;
+        this.duration = duration;
+        this.pros = pros;
+        this.cons = cons;
+        this.verdict = verdict;
     }
 
 

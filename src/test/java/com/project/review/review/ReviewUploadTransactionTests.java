@@ -34,6 +34,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
+import static com.project.review.review.ReviewContentFixtures.textDocument;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -85,8 +86,8 @@ class ReviewUploadTransactionTests {
     @Test
     void createsImageLessReviewWithoutR2() {
         ReviewResponse result = reviewService.create(request("후기", null, null), jwt);
-        assertThat(result.mainImageUrl()).isNull();
-        assertThat(result.subImageUrls()).isEmpty();
+        assertThat(result.mainImageKey()).isNull();
+        assertThat(result.subImageKeys()).isEmpty();
         assertThat(reviews.count()).isEqualTo(1);
         verifyNoInteractions(s3Client);
     }
@@ -100,8 +101,8 @@ class ReviewUploadTransactionTests {
         ReviewResponse result = reviewService.create(
                 request("후기", "reviews/z-main", List.of("reviews/a-sub")), jwt);
 
-        assertThat(result.mainImageUrl()).endsWith("/reviews/z-main");
-        assertThat(result.subImageUrls()).containsExactly("https://images.example.com/reviews/a-sub");
+        assertThat(result.mainImageKey()).isEqualTo("reviews/z-main");
+        assertThat(result.subImageKeys()).containsExactly("reviews/a-sub");
         assertThat(uploads.findAll()).allMatch(upload -> upload.getStatus() == UploadStatus.ATTACHED);
         assertThat(reviews.count()).isEqualTo(1);
     }
@@ -242,6 +243,6 @@ class ReviewUploadTransactionTests {
     }
 
     private ReviewRequest request(String title, String mainKey, List<String> subKeys) {
-        return new ReviewRequest(title, "내용", new BigDecimal("4.5"), categoryId, mainKey, subKeys);
+        return new ReviewRequest(title, "Product", textDocument("내용"), new BigDecimal("4.5"), categoryId, mainKey, subKeys, null, null, null, null);
     }
 }

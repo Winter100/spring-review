@@ -196,7 +196,8 @@ class ReviewViewPostgresTests {
         try (var executor = Executors.newSingleThreadExecutor()) {
             Future<?> edit = executor.submit(() -> transactions.executeWithoutResult(status -> {
                 Review review = reviews.findById(reviewId).orElseThrow();
-                review.updateDetails("수정됨", review.getContent(), review.getRating(), review.getCategory());
+                review.updateDetails("수정됨", review.getContent(), review.getRating(), review.getProduct(),
+                        review.getCategory(), review.getDuration(), review.getPros(), review.getCons(), review.getVerdict());
                 loaded.countDown();
                 await(viewed);
             }));
@@ -257,7 +258,8 @@ class ReviewViewPostgresTests {
     }
 
     private Long saveReview() {
-        return reviews.saveAndFlush(Review.builder().title("조회 테스트").content("본문")
+        return reviews.saveAndFlush(Review.builder().title("조회 테스트").product("Product")
+                .content(ReviewContentFixtures.textDocument("본문"))
                 .rating(BigDecimal.ONE).author(author).category(category).build()).getId();
     }
 
